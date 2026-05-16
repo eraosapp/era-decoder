@@ -140,7 +140,75 @@ function Index() {
   );
 }
 
-function ProgressDots({ index }: { index: number }) {
+
+const MARQUEE_ITEMS = ["know your arc", "decode your era", "find your vibe", "trust the process"];
+
+function IntroScreen({ onStart }: { onStart: () => void }) {
+  return (
+    <div className="absolute inset-0 overflow-hidden text-white" style={{ background: "var(--grad-hero)" }}>
+      {/* floating blobs */}
+      <div className="blob float-slow" style={{ width: 320, height: 320, background: "#FF006E", top: -60, left: -80 }} />
+      <div className="blob float-med" style={{ width: 280, height: 280, background: "#FFBE0B", bottom: -60, right: -60 }} />
+      <div className="blob float-slow" style={{ width: 220, height: 220, background: "#8338EC", top: "40%", right: -40 }} />
+      <div className="grain absolute inset-0 pointer-events-none" />
+
+      {/* scattered stars */}
+      <div className="absolute inset-0 pointer-events-none">
+        {[
+          { top: "12%", left: "78%", s: 6 },
+          { top: "22%", left: "18%", s: 4 },
+          { top: "36%", left: "62%", s: 5 },
+          { top: "52%", left: "8%", s: 3 },
+          { top: "62%", left: "84%", s: 4 },
+          { top: "70%", left: "30%", s: 6 },
+        ].map((d, i) => (
+          <div key={i} className="twinkle absolute rounded-full bg-white"
+            style={{ top: d.top, left: d.left, width: d.s, height: d.s, animationDelay: `${i * 0.3}s` }} />
+        ))}
+      </div>
+
+      <div className="relative h-full flex flex-col px-6 pt-6 pb-7">
+        {/* logo */}
+        <div className="flex items-center gap-2">
+          <span className="inline-block w-2.5 h-2.5 rounded-full bg-[#FFBE0B] shadow-[0_0_10px_#FFBE0B]" />
+          <span className="text-sm font-light tracking-tight lowercase">era os</span>
+        </div>
+
+        {/* headline */}
+        <div className="mt-10">
+          <h1 className="font-display text-[4.2rem] leading-[0.92] -tracking-[0.04em] text-shadow-pop">
+            <span className="block text-white">DECODE</span>
+            <span className="block text-white">YOUR</span>
+            <span className="block text-[#FFBE0B]">ERA.</span>
+          </h1>
+          <p className="mt-5 text-sm font-semibold text-white/90 max-w-[18rem]">
+            Three weird questions. One brutally honest card.
+          </p>
+        </div>
+
+        {/* marquee */}
+        <div className="mt-6 marquee">
+          <div className="marquee-track text-xs font-black uppercase tracking-[0.25em] text-white/85">
+            {[...MARQUEE_ITEMS, ...MARQUEE_ITEMS, ...MARQUEE_ITEMS].map((t, i) => (
+              <span key={i} className="px-3">{t} ·</span>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex-1" />
+
+        {/* button */}
+        <button
+          onClick={onStart}
+          className="press neon-pulse animate-bounce-in w-full rounded-2xl py-6 font-display text-[1.6rem] uppercase tracking-wide bg-black text-white border-[4px] border-black border-b-[6px] border-b-[#FFBE0B] shadow-[6px_6px_0_0_#000]"
+        >
+          Decode My Era
+        </button>
+      </div>
+    </div>
+  );
+}
+
   return (
     <div className="absolute top-0 left-0 right-0 flex gap-1.5 px-4 pt-4 z-30">
       {[0, 1, 2].map((i) => (
