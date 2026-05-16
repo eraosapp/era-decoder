@@ -1,6 +1,6 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast, Toaster } from "sonner";
 import { decodeEra, type EraCard as EraCardType } from "@/lib/era.functions";
 import { QUESTIONS } from "@/lib/era-questions";
@@ -10,42 +10,80 @@ export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
       { title: "EraOS — Decode Your Era" },
-      { name: "description", content: "Three unhinged questions. One brutally honest era card. Spotify Wrapped energy for your soul." },
+      { name: "description", content: "Three unhinged questions. One brutally honest era card." },
     ],
   }),
   component: Index,
 });
 
-const BLOCK_STYLES = [
-  { bg: "#CCFF00", text: "text-black", tilt: "-rotate-[1.5deg]", numColor: "text-black/15" },
-  { bg: "#FF4D6D", text: "text-white", tilt: "rotate-[1.5deg]",  numColor: "text-white/20" },
-  { bg: "#00B4D8", text: "text-white", tilt: "-rotate-[1deg]",   numColor: "text-white/20" },
+const Q_STYLES = [
+  { bg: "#CCFF00", text: "text-black", accent: "#000", transition: "liquid" },
+  { bg: "#FF4D6D", text: "text-white", accent: "#fff", transition: "glitch" },
+  { bg: "#00B4D8", text: "text-white", accent: "#fff", transition: "fade" },
 ] as const;
 
-const MARQUEE_ITEMS = ["know your arc", "decode your era", "find your vibe"];
+const LOADING_TEXT = "decoding your chaos...";
 
 function Index() {
   const decode = useServerFn(decodeEra);
   const router = useRouter();
-  const [answers, setAnswers] = useState<Record<string, string>>({});
+
+  const [step, setStep] = useState(0); // 0,1,2 = questions, 3 = loading, 4 = card
+  const [answers, setAnswers] = useState<string[]>([]);
+  const [selected, setSelected] = useState<string | null>(null);
+  const [transitioning, setTransitioning] = useState<null | "liquid" | "glitch" | "fade">(null);
   const [card, setCard] = useState<EraCardType | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [typed, setTyped] = useState("");
 
-  const allAnswered = QUESTIONS.every((q) => answers[q.id]);
+  // Typewriter
+  useEffect(() => {
+    if (step !== 3) return;
+    setTyped("");
+    let i = 0;
+    const id = setInterval(() => {
+      i++;
+      setTyped(LOADING_TEXT.slice(0, i));
+      if (i >= LOADING_TEXT.length) clearInterval(id);
+    }, 70);
+    return () => clearInterval(id);
+  }, [step]);
 
-  const onDecode = async () => {
-    if (!allAnswered) return;
-    setLoading(true);
+  const runDecode = async (allAnswers: string[]) => {
+    setStep(3);
     try {
       const result = await decode({
-        data: { answers: QUESTIONS.map((q) => ({ question: q.prompt, answer: answers[q.id] })) },
+        data: { answers: QUESTIONS.map((q, i) => ({ question: q.prompt, answer: allAnswers[i] })) },
       });
-      setCard(result);
+      // Hold loading at least ~1.6s for drama
+      setTimeout(() => {
+        setCard(result);
+        setStep(4);
+      }, 1600);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Something went sideways. Try again.");
-    } finally {
-      setLoading(false);
+      toast.error(e instanceof Error ? e.message : "Something went sideways.");
+      setStep(2);
     }
+  };
+
+  const handleSelect = (opt: string) => {
+    if (selected || transitioning) return;
+    setSelected(opt);
+    const curStyle = Q_STYLES[step];
+    // glow phase, then transition
+    setTimeout(() => {
+      setTransitioning(curStyle.transition);
+      setTimeout(() => {
+        const nextAnswers = [...answers, opt];
+        setAnswers(nextAnswers);
+        setSelected(null);
+        setTransitioning(null);
+        if (step < 2) {
+          setStep(step + 1);
+        } else {
+          runDecode(nextAnswers);
+        }
+      }, 700);
+    }, 500);
   };
 
   const onSave = () => {
@@ -63,165 +101,105 @@ function Index() {
 
   const reset = () => {
     setCard(null);
-    setAnswers({});
+    setAnswers([]);
+    setSelected(null);
+    setStep(0);
     router.invalidate();
   };
 
   return (
-    <main className={"relative min-h-screen overflow-hidden text-white " + (card ? "grad-result" : "grad-hero")}>
+    <main className="relative h-[100dvh] w-full overflow-hidden text-white font-sans">
       <Toaster theme="dark" position="top-center" richColors />
-
-      {/* Floating iOS-wallpaper blobs */}
-      <div className="blob float-slow h-[360px] w-[360px] -top-24 -left-20 bg-white/40" />
-      <div className="blob float-med  h-[280px] w-[280px] top-1/4 -right-20 bg-[#FFBE0B]" />
-      <div className="blob float-slow h-[300px] w-[300px] bottom-10 -left-16 bg-[#FF006E]" />
-      <div className="blob float-med  h-[220px] w-[220px] bottom-1/3 right-1/4 bg-white/30" />
-      <div className="grain absolute inset-0" />
-
-      {/* Scattered stars & dots */}
-      <Sparkles />
-
-      <div className="relative mx-auto max-w-md px-5 pt-7 pb-16">
-        {/* Logo */}
-        <header className="flex items-center justify-between mb-6 fade-in">
-          <div className="flex items-center gap-2">
-            <span className="inline-block h-2.5 w-2.5 rounded-full bg-[#FFBE0B] shadow-[0_0_12px_#FFBE0B]" />
-            <span className="font-display text-xl lowercase tracking-tight text-white text-shadow-pop">era os</span>
-          </div>
-        </header>
-
-        {!card && (
-          <>
-            <section className="mb-5 fade-up">
-              <h1 className="font-display text-[5.8rem] leading-[0.82] -tracking-[0.06em] text-shadow-pop">
-                <span className="block text-white">DECODE</span>
-                <span className="block text-white">YOUR</span>
-                <span className="block text-[#FFBE0B]">ERA.</span>
-              </h1>
-              <p className="mt-4 text-white text-[15px] font-bold leading-snug max-w-xs text-shadow-pop">
-                Three weird questions. One brutally honest card. ✦
-              </p>
-            </section>
-
-            {/* Marquee */}
-            <div className="marquee my-6 py-2 border-y-2 border-black bg-black/85">
-              <div className="marquee-track text-white font-display text-sm uppercase tracking-[0.15em]">
-                {[...Array(2)].map((_, i) => (
-                  <span key={i} className="flex">
-                    {[...MARQUEE_ITEMS, ...MARQUEE_ITEMS].map((t, j) => (
-                      <span key={j} className="px-5">
-                        {t} <span className="text-[#FFBE0B]">✦</span>
-                      </span>
-                    ))}
-                  </span>
-                ))}
-              </div>
-            </div>
-
-            <div className="space-y-7">
-              {QUESTIONS.map((q, idx) => (
-                <QuestionBlock
-                  key={q.id}
-                  index={idx}
-                  prompt={q.prompt}
-                  options={q.options}
-                  selected={answers[q.id]}
-                  onSelect={(opt) => setAnswers((a) => ({ ...a, [q.id]: opt }))}
-                />
-              ))}
-            </div>
-
-            <button
-              onClick={onDecode}
-              disabled={!allAnswered || loading}
-              className={
-                "press neon-pulse animate-bounce-in mt-10 w-full rounded-2xl py-8 font-display text-[2.1rem] tracking-wide uppercase transition-all border-[5px] border-black " +
-                "border-b-[8px] border-b-[#FFBE0B] shadow-[8px_8px_0_0_#000] " +
-                (allAnswered && !loading
-                  ? "bg-gradient-to-r from-[#FF006E] to-[#8338EC] text-white hover:translate-y-[2px] hover:shadow-[4px_4px_0_0_#000]"
-                  : "bg-black/70 text-white/70 cursor-not-allowed")
-              }
-            >
-              {loading ? "Consulting the oracle…" : "Decode My Era"}
-            </button>
-          </>
-        )}
-
-        {card && (
-          <div className="fade-in pt-2">
-            <h2 className="font-display text-5xl mb-5 -tracking-[0.04em] text-shadow-pop">
-              <span className="text-white">YOUR ERA,</span><br/>
-              <span className="text-[#FFBE0B]">DECODED.</span>
-            </h2>
-            <EraCard card={card} />
-
-            <div className="mt-6 grid gap-3">
-              <button
-                onClick={onSave}
-                className="press w-full rounded-2xl py-5 font-display text-lg uppercase tracking-wide bg-black text-white border-[3px] border-black border-b-[6px] border-b-[#FFBE0B] shadow-[6px_6px_0_0_#000]"
-              >
-                Save Card
-              </button>
-              <button
-                onClick={reset}
-                className="press w-full rounded-2xl py-4 text-xs font-bold tracking-[0.3em] uppercase bg-white text-black border-[3px] border-black shadow-[6px_6px_0_0_#000]"
-              >
-                Re-decode
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-
       <link
         rel="stylesheet"
         href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;600;700;800;900&display=swap"
       />
+
+      {step <= 2 && (
+        <QuestionScreen
+          index={step}
+          question={QUESTIONS[step]}
+          selected={selected}
+          transitioning={transitioning}
+          onSelect={handleSelect}
+        />
+      )}
+
+      {step === 3 && <LoadingScreen typed={typed} />}
+
+      {step === 4 && card && (
+        <ResultScreen card={card} onSave={onSave} onReset={reset} />
+      )}
     </main>
   );
 }
 
-function QuestionBlock({
-  index, prompt, options, selected, onSelect,
+function ProgressDots({ index }: { index: number }) {
+  return (
+    <div className="absolute top-0 left-0 right-0 flex gap-1.5 px-4 pt-4 z-30">
+      {[0, 1, 2].map((i) => (
+        <div key={i} className="flex-1 h-1 rounded-full bg-black/20 overflow-hidden">
+          <div
+            className="h-full bg-black transition-all duration-500"
+            style={{ width: i < index ? "100%" : i === index ? "100%" : "0%" }}
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function QuestionScreen({
+  index, question, selected, transitioning, onSelect,
 }: {
-  index: number; prompt: string; options: string[];
-  selected?: string; onSelect: (opt: string) => void;
+  index: number;
+  question: typeof QUESTIONS[number];
+  selected: string | null;
+  transitioning: null | "liquid" | "glitch" | "fade";
+  onSelect: (opt: string) => void;
 }) {
-  const s = BLOCK_STYLES[index % BLOCK_STYLES.length];
+  const s = Q_STYLES[index];
+  const transClass =
+    transitioning === "liquid" ? "anim-liquid"
+    : transitioning === "glitch" ? "anim-glitch"
+    : transitioning === "fade" ? "anim-fade-out"
+    : "";
+
   return (
     <div
-      className={"sticker relative overflow-hidden rounded-[28px] p-6 pt-5 fade-up transform " + s.tilt + " " + s.text}
-      style={{ background: s.bg, animationDelay: `${0.08 + index * 0.08}s` }}
+      key={index}
+      className={"absolute inset-0 flex flex-col px-6 pt-10 pb-8 anim-question-in " + s.text + " " + transClass}
+      style={{ background: s.bg }}
     >
-      <div className="grain absolute inset-0" />
-      <div
-        className={"pointer-events-none absolute -top-8 -right-2 font-display text-[12rem] leading-none select-none " + s.numColor}
-        aria-hidden
-      >
-        0{index + 1}
-      </div>
+      <ProgressDots index={index} />
+      <div className="grain absolute inset-0 pointer-events-none" />
 
-      <div className="relative">
-        <div className="text-[10px] font-black tracking-[0.3em] uppercase mb-3 opacity-80">
-          Question 0{index + 1} / 03
+      <div className="relative flex-1 flex flex-col">
+        <div className="text-[11px] font-black tracking-[0.35em] uppercase opacity-70 mb-4">
+          0{index + 1} / 03
         </div>
-        <h3 className="font-display text-[1.95rem] leading-[1.02] mb-5 -tracking-[0.03em]">
-          {prompt}
-        </h3>
 
-        <div className="grid gap-2.5">
-          {options.map((opt) => {
+        <h2 className="font-display text-[2.4rem] leading-[1.02] -tracking-[0.03em] mb-auto">
+          {question.prompt}
+        </h2>
+
+        <div className="grid gap-3 mt-6">
+          {question.options.map((opt) => {
             const isSel = selected === opt;
             return (
               <button
                 key={opt}
                 onClick={() => onSelect(opt)}
+                disabled={!!selected}
                 className={
-                  "press text-left rounded-full px-5 py-3.5 font-bold leading-snug transition-all duration-200 border-2 border-black " +
+                  "press text-left rounded-full px-5 py-4 font-bold leading-snug border-2 border-black transition-all duration-300 " +
                   (isSel
-                    ? "bg-black text-white text-[16.5px] border-l-[6px] border-l-[#FFBE0B] shadow-[4px_4px_0_0_#000]"
-                    : "bg-white text-black text-[15px] hover:bg-white/90")
+                    ? "bg-black text-white answer-glow scale-[1.02]"
+                    : selected
+                      ? "bg-white/60 text-black/50"
+                      : "bg-white text-black hover:bg-white/95")
                 }
+                style={isSel ? { boxShadow: `0 0 0 4px ${s.bg}, 0 0 32px 8px ${s.accent === "#000" ? "#000" : "#fff"}` } : undefined}
               >
                 {opt}
               </button>
@@ -233,32 +211,56 @@ function QuestionBlock({
   );
 }
 
-function Sparkles() {
-  const items = [
-    { top: "8%",  left: "82%", color: "#FFBE0B", size: 18, kind: "star" },
-    { top: "18%", left: "6%",  color: "#fff",    size: 12, kind: "star" },
-    { top: "34%", left: "92%", color: "#fff",    size: 10, kind: "dot"  },
-    { top: "46%", left: "4%",  color: "#FFBE0B", size: 14, kind: "star" },
-    { top: "58%", left: "88%", color: "#FFBE0B", size: 16, kind: "star" },
-    { top: "70%", left: "10%", color: "#fff",    size: 9,  kind: "dot"  },
-    { top: "82%", left: "78%", color: "#fff",    size: 14, kind: "star" },
-    { top: "92%", left: "20%", color: "#FFBE0B", size: 11, kind: "dot"  },
-    { top: "26%", left: "50%", color: "#fff",    size: 8,  kind: "dot"  },
-  ];
+function LoadingScreen({ typed }: { typed: string }) {
   return (
-    <div className="pointer-events-none absolute inset-0 z-[1]">
-      {items.map((it, i) => (
-        <span
-          key={i}
-          className="absolute twinkle font-display select-none"
-          style={{
-            top: it.top, left: it.left, color: it.color,
-            fontSize: it.size, animationDelay: `${(i % 5) * 0.4}s`,
-          }}
-        >
-          {it.kind === "star" ? "✦" : "●"}
-        </span>
-      ))}
+    <div className="absolute inset-0 bg-black flex items-center justify-center px-6 anim-fade-in-slow">
+      <div className="text-center">
+        <div className="font-display text-3xl text-white tracking-tight">
+          {typed}
+          <span className="inline-block w-[3px] h-7 bg-[#FFBE0B] ml-1 align-middle blink" />
+        </div>
+        <div className="mt-6 text-[11px] tracking-[0.4em] uppercase text-white/40">
+          eraos · oracle
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ResultScreen({
+  card, onSave, onReset,
+}: {
+  card: EraCardType; onSave: () => void; onReset: () => void;
+}) {
+  return (
+    <div className="absolute inset-0 overflow-y-auto bg-gradient-to-br from-[#0a0a0f] via-[#1a0a2a] to-[#0a0a0f]">
+      <div className="grain absolute inset-0 pointer-events-none" />
+      <div className="relative mx-auto max-w-md px-5 pt-8 pb-12">
+        <h2 className="font-display text-4xl mb-5 -tracking-[0.04em] reveal" style={{ animationDelay: "0.05s" }}>
+          <span className="text-white">YOUR ERA,</span><br/>
+          <span className="text-[#FFBE0B]">DECODED.</span>
+        </h2>
+        <div className="reveal" style={{ animationDelay: "0.25s" }}>
+          <EraCard card={card} />
+        </div>
+
+        <div className="mt-6 grid gap-3">
+          <button
+            onClick={onSave}
+            className="press reveal w-full rounded-2xl py-5 font-display text-lg uppercase tracking-wide bg-black text-white border-[3px] border-black border-b-[6px] border-b-[#FFBE0B] shadow-[6px_6px_0_0_#000]"
+            style={{ animationDelay: "0.55s" }}
+          >
+            Save Card
+          </button>
+          <button
+            onClick={onReset}
+            className="press reveal w-full rounded-2xl py-4 text-xs font-bold tracking-[0.3em] uppercase bg-white text-black border-[3px] border-black shadow-[6px_6px_0_0_#000]"
+            style={{ animationDelay: "0.7s" }}
+          >
+            Re-decode
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
