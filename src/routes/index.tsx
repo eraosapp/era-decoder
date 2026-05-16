@@ -181,7 +181,7 @@ function IntroScreen({ onStart }: { onStart: () => void }) {
             <span className="block text-white">YOUR</span>
             <span className="block text-[#FFBE0B]">ERA.</span>
           </h1>
-          <p className="mt-5 text-sm font-semibold text-white/90 max-w-[18rem]">
+          <p className="mt-5 text-base font-bold text-white max-w-[18rem] drop-shadow-[0_2px_4px_rgba(0,0,0,0.35)]">
             Three weird questions. One brutally honest card.
           </p>
         </div>
