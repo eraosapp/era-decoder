@@ -135,12 +135,11 @@ function Index() {
               onClick={onDecode}
               disabled={!allAnswered || loading}
               className={
-                "press mt-10 w-full rounded-2xl py-6 font-display text-[1.65rem] tracking-wide uppercase transition-all border-[4px] border-black " +
+                "press neon-pulse animate-bounce-in mt-10 w-full rounded-2xl py-8 font-display text-[2.1rem] tracking-wide uppercase transition-all border-[5px] border-black " +
                 "border-b-[8px] border-b-[#FFBE0B] shadow-[8px_8px_0_0_#000] " +
-                "ring-4 ring-[#FFBE0B]/30 ring-offset-2 ring-offset-transparent " +
                 (allAnswered && !loading
-                  ? "bg-black text-white hover:translate-y-[2px] hover:shadow-[4px_4px_0_0_#000] hover:ring-[#FFBE0B]/50"
-                  : "bg-black/70 text-white/70 cursor-not-allowed ring-0")
+                  ? "bg-gradient-to-r from-[#FF006E] to-[#8338EC] text-white hover:translate-y-[2px] hover:shadow-[4px_4px_0_0_#000]"
+                  : "bg-black/70 text-white/70 cursor-not-allowed")
               }
             >
               {loading ? "Consulting the oracle…" : "Decode My Era"}
