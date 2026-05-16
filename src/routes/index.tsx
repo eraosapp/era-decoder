@@ -88,9 +88,6 @@ function Index() {
             <span className="inline-block h-2.5 w-2.5 rounded-full bg-[#FFBE0B] shadow-[0_0_12px_#FFBE0B]" />
             <span className="font-display text-xl lowercase tracking-tight text-white text-shadow-pop">era os</span>
           </div>
-          <span className="text-[10px] tracking-[0.3em] uppercase bg-black text-white px-3 py-1.5 rounded-full border-2 border-white/90">
-            v1 · oracle
-          </span>
         </header>
 
         {!card && (
