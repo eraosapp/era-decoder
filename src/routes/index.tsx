@@ -169,9 +169,9 @@ function IntroScreen({ onStart }: { onStart: () => void }) {
 
       <div className="relative h-full flex flex-col px-6 pt-6 pb-7">
         {/* logo */}
-        <div className="flex items-center gap-2">
-          <span className="inline-block w-2.5 h-2.5 rounded-full bg-[#FFBE0B] shadow-[0_0_10px_#FFBE0B]" />
-          <span className="text-sm font-light tracking-tight lowercase">era os</span>
+        <div className="flex items-center gap-2.5">
+          <span className="inline-block w-4 h-4 rounded-full bg-[#FFBE0B] shadow-[0_0_18px_6px_rgba(255,190,11,0.55)] animate-pulse" />
+          <span className="text-lg font-bold tracking-tight lowercase text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.4)]">era os</span>
         </div>
 
         {/* headline */}
@@ -181,26 +181,29 @@ function IntroScreen({ onStart }: { onStart: () => void }) {
             <span className="block text-white">YOUR</span>
             <span className="block text-[#FFBE0B]">ERA.</span>
           </h1>
-          <p className="mt-5 text-sm font-semibold text-white/90 max-w-[18rem]">
+          <p className="mt-5 text-base font-bold text-white max-w-[18rem] drop-shadow-[0_2px_4px_rgba(0,0,0,0.35)]">
             Three weird questions. One brutally honest card.
           </p>
         </div>
 
         {/* marquee */}
         <div className="mt-6 marquee">
-          <div className="marquee-track text-xs font-black uppercase tracking-[0.25em] text-white/85">
-            {[...MARQUEE_ITEMS, ...MARQUEE_ITEMS, ...MARQUEE_ITEMS].map((t, i) => (
-              <span key={i} className="px-3">{t} ·</span>
-            ))}
+          <div className="inline-block rounded-full bg-black/55 px-5 py-2 backdrop-blur-sm border border-white/10 shadow-[0_4px_20px_rgba(0,0,0,0.3)]">
+            <div className="marquee-track text-xs font-black uppercase tracking-[0.25em] text-white">
+              {[...MARQUEE_ITEMS, ...MARQUEE_ITEMS, ...MARQUEE_ITEMS].map((t, i) => (
+                <span key={i} className="px-3">{t} ·</span>
+              ))}
+            </div>
           </div>
         </div>
 
-        <div className="flex-1" />
+        <div className="mt-4" />
 
         {/* button */}
         <button
           onClick={onStart}
-          className="press neon-pulse animate-bounce-in w-full rounded-2xl py-6 font-display text-[1.6rem] uppercase tracking-wide bg-black text-white border-[4px] border-black border-b-[6px] border-b-[#FFBE0B] shadow-[6px_6px_0_0_#000]"
+          className="press animate-bounce-in w-full rounded-2xl py-7 font-display text-[1.8rem] uppercase tracking-wide text-white shadow-[0_0_30px_rgba(255,0,110,0.35),0_0_60px_rgba(131,56,236,0.25),6px_6px_0_0_#000]"
+          style={{ background: "linear-gradient(135deg, #FF006E 0%, #8338EC 100%)", border: "4px solid black", borderBottomWidth: "8px", borderBottomColor: "#FFBE0B" }}
         >
           Decode My Era
         </button>
