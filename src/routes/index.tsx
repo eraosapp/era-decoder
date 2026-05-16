@@ -10,11 +10,13 @@ export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
       { title: "EraOS — Decode Your Era" },
-      { name: "description", content: "A daily oracle for your current era. Brutally funny, hyper-specific, dark-luxury." },
+      { name: "description", content: "Three unhinged questions. One brutally honest era card. Spotify Wrapped energy for your soul." },
     ],
   }),
   component: Index,
 });
+
+const GRADS = ["grad-1", "grad-2", "grad-3"] as const;
 
 function Index() {
   const decode = useServerFn(decodeEra);
@@ -31,10 +33,7 @@ function Index() {
     try {
       const result = await decode({
         data: {
-          answers: QUESTIONS.map((q) => ({
-            question: q.prompt,
-            answer: answers[q.id],
-          })),
+          answers: QUESTIONS.map((q) => ({ question: q.prompt, answer: answers[q.id] })),
         },
       });
       setCard(result);
@@ -65,16 +64,19 @@ function Index() {
   };
 
   return (
-    <main className="min-h-screen bg-background bg-noise text-foreground">
+    <main className={"relative min-h-screen overflow-hidden text-white " + (card ? "grad-result" : "grad-hero")}>
       <Toaster theme="dark" position="top-center" richColors />
 
-      <div className="mx-auto max-w-md px-5 pt-10 pb-16">
-        <header className="flex items-center justify-between mb-10 fade-in">
-          <div className="flex items-center gap-2">
-            <div className="h-2 w-2 rounded-full bg-primary shadow-[0_0_12px_var(--gold)]" />
-            <span className="text-sm tracking-[0.4em] uppercase text-muted-foreground">EraOS</span>
-          </div>
-          <span className="text-[10px] tracking-[0.3em] uppercase text-muted-foreground/70">
+      {/* live blobs */}
+      <div className="blob h-[340px] w-[340px] -top-20 -left-16 bg-fuchsia-400" />
+      <div className="blob h-[300px] w-[300px] top-1/3 -right-24 bg-yellow-300" />
+      <div className="blob h-[260px] w-[260px] bottom-0 left-1/4 bg-cyan-300" />
+      <div className="grain absolute inset-0" />
+
+      <div className="relative mx-auto max-w-md px-5 pt-8 pb-16">
+        <header className="flex items-center justify-between mb-6 fade-in">
+          <span className="font-display text-2xl tracking-tighter">ERAOS</span>
+          <span className="text-[10px] tracking-[0.3em] uppercase bg-black/80 text-white px-3 py-1.5 rounded-full">
             v1 · oracle
           </span>
         </header>
@@ -82,48 +84,24 @@ function Index() {
         {!card && (
           <>
             <section className="mb-10 fade-up">
-              <h1 className="font-display text-5xl leading-[1.0] gold-text mb-3">
-                Decode your era.
+              <h1 className="font-display text-[5.5rem] leading-[0.82] text-black mb-4 -tracking-[0.06em]">
+                DECODE<br/>YOUR<br/>ERA.
               </h1>
-              <p className="text-muted-foreground text-[15px] leading-relaxed">
-                Three weird questions. One brutally honest card.
-                No notes app required.
+              <p className="text-black/80 text-[15px] font-semibold leading-snug max-w-xs">
+                Three weird questions. One brutally honest card. No notes app required.
               </p>
             </section>
 
-            <div className="space-y-7">
+            <div className="space-y-6">
               {QUESTIONS.map((q, idx) => (
-                <div
+                <QuestionBlock
                   key={q.id}
-                  className="fade-up"
-                  style={{ animationDelay: `${0.1 + idx * 0.08}s` }}
-                >
-                  <div className="flex items-center gap-3 mb-3">
-                    <span className="font-display text-2xl gold-text">0{idx + 1}</span>
-                    <h3 className="text-base leading-snug text-foreground/95">
-                      {q.prompt}
-                    </h3>
-                  </div>
-                  <div className="grid gap-2">
-                    {q.options.map((opt) => {
-                      const selected = answers[q.id] === opt;
-                      return (
-                        <button
-                          key={opt}
-                          onClick={() => setAnswers((a) => ({ ...a, [q.id]: opt }))}
-                          className={
-                            "text-left rounded-2xl px-4 py-3 text-[14.5px] leading-snug transition-all border " +
-                            (selected
-                              ? "border-primary/60 bg-primary/[0.06] text-foreground shadow-[0_0_24px_-8px_var(--gold)]"
-                              : "border-border bg-card/40 text-foreground/80 hover:border-border hover:bg-card/70")
-                          }
-                        >
-                          {opt}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
+                  index={idx}
+                  prompt={q.prompt}
+                  options={q.options}
+                  selected={answers[q.id]}
+                  onSelect={(opt) => setAnswers((a) => ({ ...a, [q.id]: opt }))}
+                />
               ))}
             </div>
 
@@ -131,10 +109,10 @@ function Index() {
               onClick={onDecode}
               disabled={!allAnswered || loading}
               className={
-                "mt-10 w-full rounded-full py-4 font-medium tracking-wide transition-all " +
+                "press mt-10 w-full rounded-full py-5 font-display text-xl tracking-wide uppercase transition-all " +
                 (allAnswered && !loading
-                  ? "bg-primary text-primary-foreground hover:brightness-110 shadow-[0_0_40px_-10px_var(--gold)]"
-                  : "bg-secondary text-muted-foreground cursor-not-allowed")
+                  ? "bg-black text-white shadow-[0_10px_0_-2px_rgba(0,0,0,0.35)] hover:translate-y-[1px]"
+                  : "bg-black/40 text-white/70 cursor-not-allowed")
               }
             >
               {loading ? "Consulting the oracle…" : "Decode My Era"}
@@ -143,19 +121,20 @@ function Index() {
         )}
 
         {card && (
-          <div className="fade-in">
+          <div className="fade-in pt-2">
+            <h2 className="font-display text-4xl text-black mb-5 -tracking-[0.04em]">YOUR ERA, DECODED.</h2>
             <EraCard card={card} />
 
             <div className="mt-6 grid gap-3">
               <button
                 onClick={onSave}
-                className="w-full rounded-full py-4 font-medium tracking-wide bg-primary text-primary-foreground hover:brightness-110 shadow-[0_0_40px_-10px_var(--gold)] transition-all"
+                className="press w-full rounded-full py-5 font-display text-lg uppercase tracking-wide bg-black text-white shadow-[0_10px_0_-2px_rgba(0,0,0,0.35)]"
               >
                 Save Card
               </button>
               <button
                 onClick={reset}
-                className="w-full rounded-full py-3 text-sm tracking-[0.2em] uppercase text-muted-foreground hover:text-foreground transition-colors"
+                className="press w-full rounded-full py-4 text-xs font-bold tracking-[0.3em] uppercase bg-white text-black"
               >
                 Re-decode
               </button>
@@ -166,8 +145,68 @@ function Index() {
 
       <link
         rel="stylesheet"
-        href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&display=swap"
+        href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;600;700;800;900&display=swap"
       />
     </main>
+  );
+}
+
+function QuestionBlock({
+  index,
+  prompt,
+  options,
+  selected,
+  onSelect,
+}: {
+  index: number;
+  prompt: string;
+  options: string[];
+  selected?: string;
+  onSelect: (opt: string) => void;
+}) {
+  const grad = GRADS[index % GRADS.length];
+  return (
+    <div
+      className={"relative overflow-hidden rounded-[32px] p-6 pt-5 fade-up " + grad}
+      style={{ animationDelay: `${0.08 + index * 0.08}s` }}
+    >
+      <div className="grain absolute inset-0" />
+      {/* giant faded number */}
+      <div
+        className="pointer-events-none absolute -top-6 -right-2 font-display text-[12rem] leading-none text-white/15 select-none"
+        aria-hidden
+      >
+        0{index + 1}
+      </div>
+
+      <div className="relative">
+        <div className="text-[10px] font-bold tracking-[0.3em] uppercase text-white/70 mb-3">
+          Question 0{index + 1} / 03
+        </div>
+        <h3 className="font-display text-[1.9rem] leading-[1.02] text-white mb-5 -tracking-[0.03em]">
+          {prompt}
+        </h3>
+
+        <div className="grid gap-2.5">
+          {options.map((opt) => {
+            const isSel = selected === opt;
+            return (
+              <button
+                key={opt}
+                onClick={() => onSelect(opt)}
+                className={
+                  "press text-left rounded-full px-5 py-3.5 font-bold leading-snug transition-all duration-200 " +
+                  (isSel
+                    ? "bg-black text-white text-[16.5px] scale-[1.02] shadow-[0_6px_0_-1px_rgba(0,0,0,0.4)]"
+                    : "bg-white text-black text-[15px] hover:bg-white/90")
+                }
+              >
+                {opt}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
   );
 }
