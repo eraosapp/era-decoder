@@ -169,9 +169,9 @@ function IntroScreen({ onStart }: { onStart: () => void }) {
 
       <div className="relative h-full flex flex-col px-6 pt-6 pb-7">
         {/* logo */}
-        <div className="flex items-center gap-2">
-          <span className="inline-block w-2.5 h-2.5 rounded-full bg-[#FFBE0B] shadow-[0_0_10px_#FFBE0B]" />
-          <span className="text-sm font-light tracking-tight lowercase">era os</span>
+        <div className="flex items-center gap-2.5">
+          <span className="inline-block w-4 h-4 rounded-full bg-[#FFBE0B] shadow-[0_0_18px_6px_rgba(255,190,11,0.55)] animate-pulse" />
+          <span className="text-lg font-bold tracking-tight lowercase text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.4)]">era os</span>
         </div>
 
         {/* headline */}
