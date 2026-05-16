@@ -22,7 +22,7 @@ const BLOCK_STYLES = [
   { bg: "#00B4D8", text: "text-white", tilt: "-rotate-[1deg]",   numColor: "text-white/20" },
 ] as const;
 
-const MARQUEE_ITEMS = ["know your arc", "decode your era", "find your vibe", "no notes app required"];
+const MARQUEE_ITEMS = ["know your arc", "decode your era", "find your vibe"];
 
 function Index() {
   const decode = useServerFn(decodeEra);
@@ -88,9 +88,6 @@ function Index() {
             <span className="inline-block h-2.5 w-2.5 rounded-full bg-[#FFBE0B] shadow-[0_0_12px_#FFBE0B]" />
             <span className="font-display text-xl lowercase tracking-tight text-white text-shadow-pop">era os</span>
           </div>
-          <span className="text-[10px] tracking-[0.3em] uppercase bg-black text-white px-3 py-1.5 rounded-full border-2 border-white/90">
-            v1 · oracle
-          </span>
         </header>
 
         {!card && (
@@ -138,11 +135,12 @@ function Index() {
               onClick={onDecode}
               disabled={!allAnswered || loading}
               className={
-                "press mt-10 w-full rounded-2xl py-5 font-display text-xl tracking-wide uppercase transition-all border-[3px] border-black " +
-                "border-b-[6px] border-b-[#FFBE0B] shadow-[6px_6px_0_0_#000] " +
+                "press mt-10 w-full rounded-2xl py-6 font-display text-[1.65rem] tracking-wide uppercase transition-all border-[4px] border-black " +
+                "border-b-[8px] border-b-[#FFBE0B] shadow-[8px_8px_0_0_#000] " +
+                "ring-4 ring-[#FFBE0B]/30 ring-offset-2 ring-offset-transparent " +
                 (allAnswered && !loading
-                  ? "bg-black text-white hover:translate-y-[1px]"
-                  : "bg-black/70 text-white/70 cursor-not-allowed")
+                  ? "bg-black text-white hover:translate-y-[2px] hover:shadow-[4px_4px_0_0_#000] hover:ring-[#FFBE0B]/50"
+                  : "bg-black/70 text-white/70 cursor-not-allowed ring-0")
               }
             >
               {loading ? "Consulting the oracle…" : "Decode My Era"}
