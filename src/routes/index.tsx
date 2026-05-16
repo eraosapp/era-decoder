@@ -28,6 +28,7 @@ function Index() {
   const decode = useServerFn(decodeEra);
   const router = useRouter();
 
+  const [started, setStarted] = useState(false);
   const [step, setStep] = useState(0); // 0,1,2 = questions, 3 = loading, 4 = card
   const [answers, setAnswers] = useState<string[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
@@ -104,6 +105,7 @@ function Index() {
     setAnswers([]);
     setSelected(null);
     setStep(0);
+    setStarted(false);
     router.invalidate();
   };
 
