@@ -117,7 +117,11 @@ function Index() {
         href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;600;700;800;900&display=swap"
       />
 
-      {step <= 2 && (
+      {!started && step === 0 && (
+        <IntroScreen onStart={() => setStarted(true)} />
+      )}
+
+      {started && step <= 2 && (
         <QuestionScreen
           index={step}
           question={QUESTIONS[step]}
