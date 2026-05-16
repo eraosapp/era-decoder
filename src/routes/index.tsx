@@ -22,7 +22,7 @@ const BLOCK_STYLES = [
   { bg: "#00B4D8", text: "text-white", tilt: "-rotate-[1deg]",   numColor: "text-white/20" },
 ] as const;
 
-const MARQUEE_ITEMS = ["know your arc", "decode your era", "find your vibe", "no notes app required"];
+const MARQUEE_ITEMS = ["know your arc", "decode your era", "find your vibe"];
 
 function Index() {
   const decode = useServerFn(decodeEra);
