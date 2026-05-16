@@ -209,6 +209,7 @@ function IntroScreen({ onStart }: { onStart: () => void }) {
   );
 }
 
+function ProgressDots({ index }: { index: number }) {
   return (
     <div className="absolute top-0 left-0 right-0 flex gap-1.5 px-4 pt-4 z-30">
       {[0, 1, 2].map((i) => (
