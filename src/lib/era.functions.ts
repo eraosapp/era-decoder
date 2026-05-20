@@ -16,6 +16,7 @@ const CardSchema = z.object({
   aura_color_hex: z.string(),
   todays_warning: z.string(),
   todays_power_move: z.string(),
+  emojis: z.array(z.string()).length(3),
 });
 
 export type EraCard = z.infer<typeof CardSchema>;
