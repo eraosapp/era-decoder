@@ -100,6 +100,21 @@ function Index() {
     }
   };
 
+  const onShare = async () => {
+    if (!card) return;
+    const text = `My current era: ${card.current_era}\n"${card.brutal_truth}"\n— decoded by era os`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: "My Era", text });
+      } else {
+        await navigator.clipboard.writeText(text);
+        toast.success("Copied to clipboard.");
+      }
+    } catch {
+      /* user cancelled */
+    }
+  };
+
   const reset = () => {
     setCard(null);
     setAnswers([]);
