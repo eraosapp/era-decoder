@@ -39,7 +39,8 @@ Return a Daily Era Card with:
 - aura_color_name: creative invented color name (e.g. "Bruised Peach")
 - aura_color_hex: matching hex code starting with #
 - todays_warning: short and dramatic, 1 sentence
-- todays_power_move: short and empowering, 1 sentence`;
+- todays_power_move: short and empowering, 1 sentence
+- emojis: exactly 3 emoji characters that capture the era's vibe (array of 3 strings, each a single emoji)`;
 
     const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -65,8 +66,14 @@ Return a Daily Era Card with:
                 aura_color_hex: { type: "string" },
                 todays_warning: { type: "string" },
                 todays_power_move: { type: "string" },
+                emojis: { type: "array", items: { type: "string" }, minItems: 3, maxItems: 3 },
               },
-              required: ["current_era", "energy_match", "brutal_truth", "aura_color_name", "aura_color_hex", "todays_warning", "todays_power_move"],
+              required: ["current_era", "energy_match", "brutal_truth", "aura_color_name", "aura_color_hex", "todays_warning", "todays_power_move", "emojis"],
+              additionalProperties: false,
+            },
+          },
+        }],
+        tool_choice: { type: "function", function: { name: "return_era_card" } },
               additionalProperties: false,
             },
           },
