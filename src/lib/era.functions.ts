@@ -74,11 +74,6 @@ Return a Daily Era Card with:
           },
         }],
         tool_choice: { type: "function", function: { name: "return_era_card" } },
-              additionalProperties: false,
-            },
-          },
-        }],
-        tool_choice: { type: "function", function: { name: "return_era_card" } },
       }),
     });
 
