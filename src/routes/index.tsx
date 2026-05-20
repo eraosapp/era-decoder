@@ -149,7 +149,7 @@ function Index() {
       {step === 3 && <LoadingScreen typed={typed} />}
 
       {step === 4 && card && (
-        <ResultScreen card={card} onSave={onSave} onReset={reset} />
+        <ResultScreen card={card} onSave={onSave} onShare={onShare} onReset={reset} />
       )}
     </main>
   );
