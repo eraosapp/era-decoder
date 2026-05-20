@@ -321,39 +321,20 @@ function LoadingScreen({ typed }: { typed: string }) {
 }
 
 function ResultScreen({
-  card, onSave, onReset,
+  card, onSave, onShare, onReset,
 }: {
-  card: EraCardType; onSave: () => void; onReset: () => void;
+  card: EraCardType; onSave: () => void; onShare: () => void; onReset: () => void;
 }) {
   return (
-    <div className="absolute inset-0 overflow-y-auto bg-gradient-to-br from-[#0a0a0f] via-[#1a0a2a] to-[#0a0a0f]">
-      <div className="grain absolute inset-0 pointer-events-none" />
-      <div className="relative mx-auto max-w-md px-5 pt-8 pb-12">
-        <h2 className="font-display text-4xl mb-5 -tracking-[0.04em] reveal" style={{ animationDelay: "0.05s" }}>
-          <span className="text-white">YOUR ERA,</span><br/>
-          <span className="text-[#FFBE0B]">DECODED.</span>
-        </h2>
-        <div className="reveal" style={{ animationDelay: "0.25s" }}>
-          <EraCard card={card} />
-        </div>
-
-        <div className="mt-6 grid gap-3">
-          <button
-            onClick={onSave}
-            className="press reveal w-full rounded-2xl py-5 font-display text-lg uppercase tracking-wide bg-black text-white border-[3px] border-black border-b-[6px] border-b-[#FFBE0B] shadow-[6px_6px_0_0_#000]"
-            style={{ animationDelay: "0.55s" }}
-          >
-            Save Card
-          </button>
-          <button
-            onClick={onReset}
-            className="press reveal w-full rounded-2xl py-4 text-xs font-bold tracking-[0.3em] uppercase bg-white text-black border-[3px] border-black shadow-[6px_6px_0_0_#000]"
-            style={{ animationDelay: "0.7s" }}
-          >
-            Re-decode
-          </button>
-        </div>
-      </div>
+    <div className="absolute inset-0 overflow-hidden">
+      <EraCard card={card} onSave={onSave} onShare={onShare} />
+      <button
+        onClick={onReset}
+        aria-label="Re-decode"
+        className="press absolute top-3 right-3 z-20 rounded-full bg-black/40 backdrop-blur-md border border-white/40 text-white text-[10px] font-black tracking-[0.25em] uppercase px-3 py-1.5"
+      >
+        ↻ redo
+      </button>
     </div>
   );
 }
