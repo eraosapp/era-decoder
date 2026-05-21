@@ -6,6 +6,9 @@ import { decodeEra, type EraCard as EraCardType } from "@/lib/era.functions";
 import { QUESTION_SETS, type Question, type Region } from "@/lib/era-questions";
 import { detectLocation } from "@/lib/location";
 import { EraCard } from "@/components/EraCard";
+import { Onboarding, type OnboardingData } from "@/components/Onboarding";
+
+const ONBOARDING_KEY = "eraos.onboarding.v1";
 
 export const Route = createFileRoute("/")({
   head: () => ({
