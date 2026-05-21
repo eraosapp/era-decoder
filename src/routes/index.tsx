@@ -3,7 +3,8 @@ import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
 import { toast, Toaster } from "sonner";
 import { decodeEra, type EraCard as EraCardType } from "@/lib/era.functions";
-import { QUESTIONS } from "@/lib/era-questions";
+import { QUESTION_SETS, type Question, type Region } from "@/lib/era-questions";
+import { detectLocation } from "@/lib/location";
 import { EraCard } from "@/components/EraCard";
 
 export const Route = createFileRoute("/")({
