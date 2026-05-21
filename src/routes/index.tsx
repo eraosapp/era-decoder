@@ -36,6 +36,16 @@ function Index() {
   const [transitioning, setTransitioning] = useState<null | "liquid" | "glitch" | "fade">(null);
   const [card, setCard] = useState<EraCardType | null>(null);
   const [typed, setTyped] = useState("");
+  const [region, setRegion] = useState<Region>("GLOBAL");
+  const questions: Question[] = QUESTION_SETS[region];
+
+  useEffect(() => {
+    let cancelled = false;
+    detectLocation().then((loc) => {
+      if (!cancelled) setRegion(loc.region);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
 
   // Typewriter
   useEffect(() => {
