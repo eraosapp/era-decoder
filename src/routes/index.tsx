@@ -179,7 +179,7 @@ function Index() {
         <IntroScreen onStart={() => setStarted(true)} />
       )}
       {/* profile saved for future personalization */}
-      {profile && false && <span>{profile.name}</span>}
+      {profile?.name ? null : null}
 
       {started && step <= 2 && (
         <QuestionScreen
