@@ -32,6 +32,8 @@ function Index() {
   const decode = useServerFn(decodeEra);
   const router = useRouter();
 
+  const [onboarded, setOnboarded] = useState<boolean | null>(null);
+  const [profile, setProfile] = useState<OnboardingData | null>(null);
   const [started, setStarted] = useState(false);
   const [step, setStep] = useState(0); // 0,1,2 = questions, 3 = loading, 4 = card
   const [answers, setAnswers] = useState<string[]>([]);
@@ -41,6 +43,29 @@ function Index() {
   const [typed, setTyped] = useState("");
   const [region, setRegion] = useState<Region>("GLOBAL");
   const questions: Question[] = QUESTION_SETS[region];
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(ONBOARDING_KEY);
+      if (saved) {
+        setProfile(JSON.parse(saved));
+        setOnboarded(true);
+      } else {
+        setOnboarded(false);
+      }
+    } catch {
+      setOnboarded(false);
+    }
+  }, []);
+
+  const completeOnboarding = (data: OnboardingData) => {
+    try {
+      localStorage.setItem(ONBOARDING_KEY, JSON.stringify({ ...data, completedAt: new Date().toISOString() }));
+    } catch {}
+    setProfile(data);
+    setOnboarded(true);
+    setStarted(true);
+  };
 
   useEffect(() => {
     let cancelled = false;
