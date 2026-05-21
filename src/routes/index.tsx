@@ -257,7 +257,7 @@ function QuestionScreen({
   index, question, selected, transitioning, onSelect,
 }: {
   index: number;
-  question: typeof QUESTIONS[number];
+  question: Question;
   selected: string | null;
   transitioning: null | "liquid" | "glitch" | "fade";
   onSelect: (opt: string) => void;
