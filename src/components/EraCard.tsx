@@ -1,13 +1,11 @@
 import type { EraCard as EraCardType } from "@/lib/era.functions";
+import { CharacterAvatar, pickCharacter } from "./Characters";
 
-// Push saturation way up using HSL boost
 function boostSaturation(hex: string): string {
   const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
   if (!m) return hex;
   const n = parseInt(m[1], 16);
-  let r = ((n >> 16) & 255) / 255;
-  let g = ((n >> 8) & 255) / 255;
-  let b = (n & 255) / 255;
+  let r = ((n >> 16) & 255) / 255, g = ((n >> 8) & 255) / 255, b = (n & 255) / 255;
   const max = Math.max(r, g, b), min = Math.min(r, g, b);
   const l = (max + min) / 2;
   let h = 0, s = 0;
@@ -42,9 +40,7 @@ function complement(hex: string): string {
   const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
   if (!m) return "#FFBE0B";
   const n = parseInt(m[1], 16);
-  let r = ((n >> 16) & 255) / 255;
-  let g = ((n >> 8) & 255) / 255;
-  let b = (n & 255) / 255;
+  let r = ((n >> 16) & 255) / 255, g = ((n >> 8) & 255) / 255, b = (n & 255) / 255;
   const max = Math.max(r, g, b), min = Math.min(r, g, b);
   const l = (max + min) / 2;
   let h = 0, s = 0;
@@ -76,181 +72,115 @@ function complement(hex: string): string {
   return `#${[rr, gg, bb].map(v => v.toString(16).padStart(2, "0")).join("")}`;
 }
 
-// Deterministic scattered positions for stars/dots
 const STARS = [
-  { top: "6%", left: "8%", size: 14, delay: "0s" },
-  { top: "12%", left: "78%", size: 10, delay: "0.4s" },
-  { top: "22%", left: "42%", size: 8, delay: "0.9s" },
-  { top: "34%", left: "88%", size: 12, delay: "0.2s" },
-  { top: "48%", left: "6%", size: 10, delay: "1.1s" },
-  { top: "58%", left: "92%", size: 8, delay: "0.7s" },
-  { top: "70%", left: "12%", size: 12, delay: "1.4s" },
-  { top: "82%", left: "70%", size: 10, delay: "0.3s" },
-  { top: "90%", left: "30%", size: 8, delay: "1.0s" },
-];
-
-const DOTS = [
-  { top: "18%", left: "20%", size: 4 },
-  { top: "28%", left: "65%", size: 3 },
-  { top: "40%", left: "32%", size: 5 },
-  { top: "44%", left: "72%", size: 3 },
-  { top: "54%", left: "22%", size: 4 },
-  { top: "64%", left: "50%", size: 3 },
-  { top: "76%", left: "84%", size: 5 },
-  { top: "86%", left: "48%", size: 3 },
-  { top: "14%", left: "55%", size: 3 },
-  { top: "38%", left: "12%", size: 4 },
+  { top: "8%", left: "12%", size: 10 }, { top: "14%", right: "10%", size: 8 },
+  { top: "50%", left: "6%", size: 8 }, { top: "55%", right: "6%", size: 10 },
+  { top: "78%", left: "16%", size: 8 }, { top: "82%", right: "14%", size: 10 },
 ];
 
 export function EraCard({
-  card,
-  onSave,
-  onShare,
+  card, onSave, onShare,
 }: {
-  card: EraCardType;
-  onSave?: () => void;
-  onShare?: () => void;
+  card: EraCardType; onSave?: () => void; onShare?: () => void;
 }) {
   const baseRaw = card.aura_color_hex || "#FF006E";
   const base = boostSaturation(baseRaw);
   const comp = complement(baseRaw);
+  const character = pickCharacter(card.character_type);
 
   return (
     <div
       className="absolute inset-0 flex flex-col text-white overflow-hidden"
-      style={{
-        background: `linear-gradient(135deg, ${base} 0%, ${comp} 55%, ${base} 100%)`,
-      }}
+      style={{ background: `linear-gradient(135deg, ${base} 0%, ${comp} 55%, ${base} 100%)` }}
     >
-      {/* vibrant blobs */}
-      <div
-        className="absolute -top-24 -left-24 w-80 h-80 rounded-full blur-3xl opacity-70 pointer-events-none"
-        style={{ background: comp }}
-      />
-      <div
-        className="absolute -bottom-28 -right-20 w-96 h-96 rounded-full blur-3xl opacity-70 pointer-events-none"
-        style={{ background: base }}
-      />
-      <div
-        className="absolute top-1/3 left-1/2 -translate-x-1/2 w-72 h-72 rounded-full blur-3xl opacity-40 pointer-events-none"
-        style={{ background: "#FFBE0B" }}
-      />
+      {/* blobs */}
+      <div className="absolute -top-24 -left-24 w-72 h-72 rounded-full blur-3xl opacity-60 pointer-events-none" style={{ background: comp }} />
+      <div className="absolute -bottom-24 -right-20 w-80 h-80 rounded-full blur-3xl opacity-60 pointer-events-none" style={{ background: base }} />
 
-      {/* scattered stars */}
+      {/* stars */}
       {STARS.map((s, i) => (
-        <svg
-          key={`s-${i}`}
-          className="absolute twinkle pointer-events-none drop-shadow-[0_0_6px_rgba(255,255,255,0.8)]"
-          style={{ top: s.top, left: s.left, width: s.size, height: s.size, animationDelay: s.delay }}
-          viewBox="0 0 24 24"
-          fill="white"
-        >
+        <svg key={i} className="absolute twinkle pointer-events-none drop-shadow-[0_0_6px_rgba(255,255,255,0.8)]"
+          style={{ top: s.top, left: s.left, right: s.right, width: s.size, height: s.size, animationDelay: `${i * 0.3}s` }}
+          viewBox="0 0 24 24" fill="white">
           <path d="M12 0l2.6 8.4L24 12l-9.4 3.6L12 24l-2.6-8.4L0 12l9.4-3.6z" />
         </svg>
       ))}
 
-      {/* scattered dots */}
-      {DOTS.map((d, i) => (
-        <span
-          key={`d-${i}`}
-          className="absolute rounded-full bg-white/80 pointer-events-none"
-          style={{ top: d.top, left: d.left, width: d.size, height: d.size }}
-        />
-      ))}
-
       <div className="grain absolute inset-0 pointer-events-none" />
 
-      {/* CONTENT — evenly distributed */}
-      <div className="relative h-full w-full flex flex-col justify-between px-5 pt-4 pb-4">
+      {/* CONTENT */}
+      <div className="relative h-full w-full flex flex-col px-4 pt-3 pb-3 gap-3">
         {/* TOP BAR */}
-        <div className="flex items-center justify-between text-[10px] tracking-[0.35em] uppercase text-white font-bold drop-shadow-[0_1px_3px_rgba(0,0,0,0.4)]">
+        <div className="flex items-center justify-between text-[10px] tracking-[0.35em] uppercase font-bold drop-shadow-[0_1px_3px_rgba(0,0,0,0.4)]">
           <span>● era os</span>
           <span>daily card ●</span>
         </div>
 
-        {/* AVATAR */}
-        <div className="flex justify-center fade-up" style={{ animationDelay: "0.05s" }}>
-          <div
-            className="relative h-28 w-28 rounded-full flex items-center justify-center backdrop-blur-md"
-            style={{
-              background: "rgba(255,255,255,0.18)",
-              border: "3px solid rgba(255,255,255,0.95)",
-              boxShadow:
-                "0 0 0 6px rgba(255,255,255,0.18), 0 0 50px 10px rgba(255,255,255,0.5), inset 0 0 30px rgba(255,255,255,0.2)",
-            }}
-          >
-            <div className="flex items-center gap-0.5 text-[2rem] leading-none drop-shadow-[0_2px_6px_rgba(0,0,0,0.4)]">
-              <span className="-rotate-12">{card.emojis?.[0] ?? "✨"}</span>
-              <span className="scale-125">{card.emojis?.[1] ?? "🌀"}</span>
-              <span className="rotate-12">{card.emojis?.[2] ?? "🔥"}</span>
+        {/* MAIN TWO COLUMN */}
+        <div className="grid grid-cols-[1fr_1.15fr] gap-3 items-center fade-up" style={{ animationDelay: "0.1s" }}>
+          {/* Left: character */}
+          <div className="flex flex-col items-center gap-2">
+            <CharacterAvatar name={character} size={120} />
+            <div className="text-center text-[9px] font-black uppercase tracking-[0.18em] text-white/95 drop-shadow-[0_1px_3px_rgba(0,0,0,0.5)] leading-tight">
+              {character}
+            </div>
+          </div>
+
+          {/* Right: vibe + era + truth */}
+          <div className="flex flex-col gap-2 min-w-0">
+            <div className="font-display text-[2.4rem] leading-[0.9] -tracking-[0.04em] text-white drop-shadow-[0_3px_10px_rgba(0,0,0,0.4)] break-words">
+              {card.vibe_word}
+            </div>
+            <div className="font-display text-[1rem] leading-[1] uppercase text-white/95 -tracking-[0.02em] break-words">
+              {card.current_era}
+            </div>
+            <div className="rounded-xl px-2.5 py-1.5 bg-white/95 text-black backdrop-blur-sm shadow-[0_6px_18px_rgba(0,0,0,0.25)]">
+              <p className="text-[10.5px] font-bold leading-snug">
+                <span className="font-display text-base mr-1" style={{ color: base }}>"</span>
+                {card.brutal_truth}
+              </p>
             </div>
           </div>
         </div>
 
-        {/* ERA NAME with shimmer */}
-        <div className="relative fade-up" style={{ animationDelay: "0.15s" }}>
-          <h2
-            className="font-display text-center text-[2.1rem] leading-[0.95] -tracking-[0.03em] uppercase relative"
-            style={{
-              textShadow: "0 2px 16px rgba(0,0,0,0.35), 0 0 30px rgba(255,255,255,0.25)",
-            }}
-          >
-            {card.current_era}
-          </h2>
-          <div
-            className="absolute inset-0 pointer-events-none shimmer-bg"
-            style={{ mixBlendMode: "overlay" }}
-          />
+        {/* TRAITS ROW — 3 pills full width */}
+        <div className="grid grid-cols-3 gap-1.5 fade-up" style={{ animationDelay: "0.2s" }}>
+          <Trait icon="●" label="aura" value={card.aura_color_name} tint={base} />
+          <Trait icon="⚠" label="warning" value={card.todays_warning} tint={comp} />
+          <Trait icon="⚡" label="power move" value={card.todays_power_move} tint={base} />
         </div>
 
-        {/* BRUTAL TRUTH */}
-        <div
-          className="rounded-2xl px-4 py-3 backdrop-blur-md fade-up"
-          style={{
-            animationDelay: "0.25s",
-            background: "rgba(255,255,255,0.92)",
-            border: "1px solid rgba(255,255,255,0.7)",
-            boxShadow: "0 10px 30px rgba(0,0,0,0.22)",
-          }}
-        >
-          <div className="flex gap-2">
-            <span
-              className="font-display text-3xl leading-none -mt-1"
-              style={{ color: base }}
-            >
-              “
-            </span>
-            <p className="text-[0.95rem] font-bold text-black/85 leading-snug">
-              {card.brutal_truth}
+        {/* COSMIC ENERGY */}
+        <div className="flex-1 flex flex-col gap-1.5 fade-up min-h-0" style={{ animationDelay: "0.3s" }}>
+          <div className="h-px bg-white/30" />
+          <div className="text-center text-[10px] tracking-[0.3em] uppercase font-black text-white/95 drop-shadow-[0_1px_3px_rgba(0,0,0,0.4)]">
+            ✦ cosmic energy today ✦
+          </div>
+          <div className="rounded-xl px-3 py-2 bg-black/30 backdrop-blur-md border border-white/20 overflow-hidden">
+            <p className="text-[11px] leading-snug text-white/95 italic">
+              {card.cosmic_prediction}
             </p>
           </div>
         </div>
 
-        {/* PILLS — larger, wrap text */}
-        <div className="flex flex-col gap-2 fade-up" style={{ animationDelay: "0.35s" }}>
-          <Pill label={card.aura_color_name} tint={base} icon="●" />
-          <Pill label={card.todays_warning} tint={comp} icon="⚠" />
-          <Pill label={card.todays_power_move} tint={base} icon="⚡" />
-        </div>
-
         {/* BUTTONS */}
-        <div className="grid gap-2 fade-up" style={{ animationDelay: "0.5s" }}>
+        <div className="grid grid-cols-2 gap-2 fade-up" style={{ animationDelay: "0.45s" }}>
           <button
             onClick={onSave}
-            className="press w-full rounded-2xl py-3.5 font-display text-base uppercase tracking-wide bg-black text-white border-2 border-black/80 shadow-[0_6px_0_0_rgba(0,0,0,0.35)]"
+            className="press rounded-xl py-2.5 font-display text-xs uppercase tracking-wide bg-black text-white border-2 border-black/80 shadow-[0_4px_0_0_rgba(0,0,0,0.35)]"
           >
             Save Card
           </button>
           <button
             onClick={onShare}
-            className="press w-full rounded-2xl py-3 font-display text-sm uppercase tracking-wide text-white border-2 border-white/90 bg-white/15 backdrop-blur-sm"
+            className="press rounded-xl py-2.5 font-display text-xs uppercase tracking-wide text-white border-2 border-white/90 bg-white/15 backdrop-blur-sm"
           >
             Share
           </button>
         </div>
 
         {/* WATERMARK */}
-        <div className="text-center text-[9px] tracking-[0.4em] uppercase text-white/60">
+        <div className="text-center text-[8px] tracking-[0.4em] uppercase text-white/60">
           era os
         </div>
       </div>
@@ -258,18 +188,22 @@ export function EraCard({
   );
 }
 
-function Pill({ label, tint, icon }: { label: string; tint: string; icon: string }) {
+function Trait({ icon, label, value, tint }: { icon: string; label: string; value: string; tint: string }) {
   return (
-    <span
-      className="rounded-2xl px-4 py-2.5 text-[11px] font-black uppercase tracking-[0.14em] text-white flex items-start gap-2 backdrop-blur-sm leading-tight"
+    <div
+      className="rounded-xl px-2 py-1.5 text-white backdrop-blur-sm overflow-hidden flex flex-col"
       style={{
         background: `${tint}dd`,
         border: "1.5px solid rgba(255,255,255,0.9)",
-        boxShadow: "0 6px 16px rgba(0,0,0,0.22)",
+        boxShadow: "0 4px 12px rgba(0,0,0,0.22)",
       }}
     >
-      <span className="text-sm leading-none mt-px shrink-0">{icon}</span>
-      <span className="break-words">{label}</span>
-    </span>
+      <div className="flex items-center gap-1 text-[8px] font-black uppercase tracking-[0.18em] opacity-90">
+        <span className="text-[10px]">{icon}</span>{label}
+      </div>
+      <div className="text-[10px] font-bold leading-tight mt-0.5 break-words line-clamp-3">
+        {value}
+      </div>
+    </div>
   );
 }

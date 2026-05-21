@@ -92,7 +92,11 @@ function Index() {
     setStep(3);
     try {
       const result = await decode({
-        data: { answers: questions.map((q, i) => ({ question: q.prompt, answer: allAnswers[i] })) },
+        data: {
+          answers: questions.map((q, i) => ({ question: q.prompt, answer: allAnswers[i] })),
+          zodiac: profile?.zodiac || undefined,
+          name: profile?.name || undefined,
+        },
       });
       // Hold loading at least ~1.6s for drama
       setTimeout(() => {

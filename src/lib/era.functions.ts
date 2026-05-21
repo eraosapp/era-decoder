@@ -6,7 +6,16 @@ const InputSchema = z.object({
     question: z.string(),
     answer: z.string(),
   })).length(3),
+  zodiac: z.string().optional(),
+  name: z.string().optional(),
 });
+
+const CHARACTERS = [
+  "The Menace", "The Ghost", "The Delulu", "The Villain",
+  "The Sage", "The Gremlin", "The Romantic", "The Chaotic",
+  "The Unbothered", "The Overthinker", "The Main Character", "The Goblin",
+  "The Mystic", "The Softlaunch", "The Haunted", "The Feral",
+] as const;
 
 const CardSchema = z.object({
   current_era: z.string(),
@@ -17,6 +26,9 @@ const CardSchema = z.object({
   todays_warning: z.string(),
   todays_power_move: z.string(),
   emojis: z.array(z.string()).length(3),
+  character_type: z.enum(CHARACTERS),
+  vibe_word: z.string(),
+  cosmic_prediction: z.string(),
 });
 
 export type EraCard = z.infer<typeof CardSchema>;
@@ -27,20 +39,27 @@ export const decodeEra = createServerFn({ method: "POST" })
     const apiKey = process.env.LOVABLE_API_KEY;
     if (!apiKey) throw new Error("LOVABLE_API_KEY not configured");
 
-    const prompt = `You are EraOS, a brutally funny, Gen Z oracle. Based on these answers, decode the user's CURRENT ERA. Be specific, weird, dramatic, and unhinged-but-poetic. Avoid clichés. No emojis.
+    const zodiacLine = data.zodiac ? `\nZodiac sign: ${data.zodiac}` : "";
+    const nameLine = data.name ? `\nName: ${data.name}` : "";
+
+    const prompt = `You are EraOS, a brutally funny, Gen Z oracle. Decode the user's CURRENT ERA. Be specific, weird, dramatic, and unhinged-but-poetic. Avoid clichés. No emojis in text fields.
+${nameLine}${zodiacLine}
 
 Answers:
 ${data.answers.map((a, i) => `${i + 1}. ${a.question}\n   -> ${a.answer}`).join("\n")}
 
 Return a Daily Era Card with:
-- current_era: 2-4 words, evocative (e.g. "Quiet Villain Arc", "Soft Launch Saboteur")
-- energy_match: a hyper-specific funny comparison (e.g. "a Tuesday afternoon at a Whole Foods hot bar")
+- current_era: 2-4 words, evocative (e.g. "Quiet Villain Arc")
+- energy_match: hyper-specific funny comparison
 - brutal_truth: ONE sharp funny line
-- aura_color_name: creative invented color name (e.g. "Bruised Peach")
-- aura_color_hex: matching hex code starting with #
-- todays_warning: short and dramatic, 1 sentence
-- todays_power_move: short and empowering, 1 sentence
-- emojis: exactly 3 emoji characters that capture the era's vibe (array of 3 strings, each a single emoji)`;
+- aura_color_name: invented color name (e.g. "Bruised Peach")
+- aura_color_hex: matching hex starting with #
+- todays_warning: 1 dramatic sentence
+- todays_power_move: 1 empowering sentence
+- emojis: exactly 3 emoji characters capturing the vibe
+- character_type: pick EXACTLY ONE from this list that fits today: ${CHARACTERS.join(", ")}
+- vibe_word: ONE punchy uppercase word (e.g. MENACE, DELULU, UNHINGED, HAUNTED, GOBLIN, CHAOTIC, FERAL, SOFT)
+- cosmic_prediction: 2-3 sentence prediction combining the user's zodiac energy with today's answers. Mystical, witty, oddly specific.`;
 
     const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -67,8 +86,11 @@ Return a Daily Era Card with:
                 todays_warning: { type: "string" },
                 todays_power_move: { type: "string" },
                 emojis: { type: "array", items: { type: "string" }, minItems: 3, maxItems: 3 },
+                character_type: { type: "string", enum: CHARACTERS as unknown as string[] },
+                vibe_word: { type: "string" },
+                cosmic_prediction: { type: "string" },
               },
-              required: ["current_era", "energy_match", "brutal_truth", "aura_color_name", "aura_color_hex", "todays_warning", "todays_power_move", "emojis"],
+              required: ["current_era", "energy_match", "brutal_truth", "aura_color_name", "aura_color_hex", "todays_warning", "todays_power_move", "emojis", "character_type", "vibe_word", "cosmic_prediction"],
               additionalProperties: false,
             },
           },
