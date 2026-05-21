@@ -171,8 +171,12 @@ function Index() {
         href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;600;700;800;900&display=swap"
       />
 
-      {!started && step === 0 && (
-        <IntroScreen onStart={() => setStarted(true)} />
+      {onboarded === false && (
+        <Onboarding onDone={completeOnboarding} />
+      )}
+
+      {onboarded && !started && step === 0 && (
+        <IntroScreen onStart={() => setStarted(true)} profile={profile} />
       )}
 
       {started && step <= 2 && (
