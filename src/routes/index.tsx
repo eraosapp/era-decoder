@@ -3,7 +3,8 @@ import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
 import { toast, Toaster } from "sonner";
 import { decodeEra, type EraCard as EraCardType } from "@/lib/era.functions";
-import { QUESTIONS } from "@/lib/era-questions";
+import { QUESTION_SETS, type Question, type Region } from "@/lib/era-questions";
+import { detectLocation } from "@/lib/location";
 import { EraCard } from "@/components/EraCard";
 
 export const Route = createFileRoute("/")({
@@ -35,6 +36,16 @@ function Index() {
   const [transitioning, setTransitioning] = useState<null | "liquid" | "glitch" | "fade">(null);
   const [card, setCard] = useState<EraCardType | null>(null);
   const [typed, setTyped] = useState("");
+  const [region, setRegion] = useState<Region>("GLOBAL");
+  const questions: Question[] = QUESTION_SETS[region];
+
+  useEffect(() => {
+    let cancelled = false;
+    detectLocation().then((loc) => {
+      if (!cancelled) setRegion(loc.region);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
 
   // Typewriter
   useEffect(() => {
@@ -53,7 +64,7 @@ function Index() {
     setStep(3);
     try {
       const result = await decode({
-        data: { answers: QUESTIONS.map((q, i) => ({ question: q.prompt, answer: allAnswers[i] })) },
+        data: { answers: questions.map((q, i) => ({ question: q.prompt, answer: allAnswers[i] })) },
       });
       // Hold loading at least ~1.6s for drama
       setTimeout(() => {
@@ -139,7 +150,7 @@ function Index() {
       {started && step <= 2 && (
         <QuestionScreen
           index={step}
-          question={QUESTIONS[step]}
+          question={questions[step]}
           selected={selected}
           transitioning={transitioning}
           onSelect={handleSelect}
@@ -246,7 +257,7 @@ function QuestionScreen({
   index, question, selected, transitioning, onSelect,
 }: {
   index: number;
-  question: typeof QUESTIONS[number];
+  question: Question;
   selected: string | null;
   transitioning: null | "liquid" | "glitch" | "fade";
   onSelect: (opt: string) => void;
