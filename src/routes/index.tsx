@@ -150,7 +150,7 @@ function Index() {
       {started && step <= 2 && (
         <QuestionScreen
           index={step}
-          question={QUESTIONS[step]}
+          question={questions[step]}
           selected={selected}
           transitioning={transitioning}
           onSelect={handleSelect}
