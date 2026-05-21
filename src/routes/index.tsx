@@ -64,7 +64,7 @@ function Index() {
     setStep(3);
     try {
       const result = await decode({
-        data: { answers: QUESTIONS.map((q, i) => ({ question: q.prompt, answer: allAnswers[i] })) },
+        data: { answers: questions.map((q, i) => ({ question: q.prompt, answer: allAnswers[i] })) },
       });
       // Hold loading at least ~1.6s for drama
       setTimeout(() => {
