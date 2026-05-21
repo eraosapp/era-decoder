@@ -6,6 +6,9 @@ import { decodeEra, type EraCard as EraCardType } from "@/lib/era.functions";
 import { QUESTION_SETS, type Question, type Region } from "@/lib/era-questions";
 import { detectLocation } from "@/lib/location";
 import { EraCard } from "@/components/EraCard";
+import { Onboarding, type OnboardingData } from "@/components/Onboarding";
+
+const ONBOARDING_KEY = "eraos.onboarding.v1";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -29,6 +32,8 @@ function Index() {
   const decode = useServerFn(decodeEra);
   const router = useRouter();
 
+  const [onboarded, setOnboarded] = useState<boolean | null>(null);
+  const [profile, setProfile] = useState<OnboardingData | null>(null);
   const [started, setStarted] = useState(false);
   const [step, setStep] = useState(0); // 0,1,2 = questions, 3 = loading, 4 = card
   const [answers, setAnswers] = useState<string[]>([]);
@@ -38,6 +43,29 @@ function Index() {
   const [typed, setTyped] = useState("");
   const [region, setRegion] = useState<Region>("GLOBAL");
   const questions: Question[] = QUESTION_SETS[region];
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(ONBOARDING_KEY);
+      if (saved) {
+        setProfile(JSON.parse(saved));
+        setOnboarded(true);
+      } else {
+        setOnboarded(false);
+      }
+    } catch {
+      setOnboarded(false);
+    }
+  }, []);
+
+  const completeOnboarding = (data: OnboardingData) => {
+    try {
+      localStorage.setItem(ONBOARDING_KEY, JSON.stringify({ ...data, completedAt: new Date().toISOString() }));
+    } catch {}
+    setProfile(data);
+    setOnboarded(true);
+    setStarted(true);
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -143,9 +171,15 @@ function Index() {
         href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;600;700;800;900&display=swap"
       />
 
-      {!started && step === 0 && (
+      {onboarded === false && (
+        <Onboarding onDone={completeOnboarding} />
+      )}
+
+      {onboarded && !started && step === 0 && (
         <IntroScreen onStart={() => setStarted(true)} />
       )}
+      {/* profile saved for future personalization */}
+      {profile?.name ? null : null}
 
       {started && step <= 2 && (
         <QuestionScreen
