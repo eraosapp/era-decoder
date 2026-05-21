@@ -232,3 +232,11 @@
     100% { opacity: 1; transform: translateY(0) scale(1); }
   }
 }
+
+@layer utilities {
+  .bob { animation: bob 3s ease-in-out infinite; }
+  @keyframes bob {
+    0%, 100% { transform: translateY(0) rotate(-2deg); }
+    50%      { transform: translateY(-6px) rotate(2deg); }
+  }
+}
