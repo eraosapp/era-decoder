@@ -176,8 +176,10 @@ function Index() {
       )}
 
       {onboarded && !started && step === 0 && (
-        <IntroScreen onStart={() => setStarted(true)} profile={profile} />
+        <IntroScreen onStart={() => setStarted(true)} />
       )}
+      {/* profile saved for future personalization */}
+      {profile && false && <span>{profile.name}</span>}
 
       {started && step <= 2 && (
         <QuestionScreen
