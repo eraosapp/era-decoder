@@ -2,13 +2,15 @@ import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
 import { toast, Toaster } from "sonner";
-import { decodeEra, type EraCard as EraCardType } from "@/lib/era.functions";
-import { QUESTION_SETS, type Question, type Region } from "@/lib/era-questions";
+import {
+  submitDailyAnswers, getDailyQuestions, getTodayDecode, upsertProfile, getProfile,
+  type EraCard as EraCardType, type QuestionDTO,
+} from "@/lib/era.functions";
 import { detectLocation } from "@/lib/location";
 import { EraCard } from "@/components/EraCard";
 import { Onboarding, type OnboardingData } from "@/components/Onboarding";
-
-const ONBOARDING_KEY = "eraos.onboarding.v1";
+import { Login } from "@/components/Login";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -29,51 +31,85 @@ const Q_STYLES = [
 const LOADING_TEXT = "decoding your chaos...";
 
 function Index() {
-  const decode = useServerFn(decodeEra);
+  const decode = useServerFn(submitDailyAnswers);
+  const fetchQs = useServerFn(getDailyQuestions);
+  const fetchToday = useServerFn(getTodayDecode);
+  const saveProfile = useServerFn(upsertProfile);
+  const loadProfile = useServerFn(getProfile);
   const router = useRouter();
 
-  const [onboarded, setOnboarded] = useState<boolean | null>(null);
-  const [profile, setProfile] = useState<OnboardingData | null>(null);
+  const [authed, setAuthed] = useState<boolean | null>(null);
+  const [profile, setProfile] = useState<any>(null);
+  const [needsOnboarding, setNeedsOnboarding] = useState(false);
+
   const [started, setStarted] = useState(false);
-  const [step, setStep] = useState(0); // 0,1,2 = questions, 3 = loading, 4 = card
-  const [answers, setAnswers] = useState<string[]>([]);
+  const [step, setStep] = useState(0);
+  const [questions, setQuestions] = useState<QuestionDTO[]>([]);
+  const [answers, setAnswers] = useState<{ question_id: string; question: string; answer: string }[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [transitioning, setTransitioning] = useState<null | "liquid" | "glitch" | "fade">(null);
   const [card, setCard] = useState<EraCardType | null>(null);
   const [typed, setTyped] = useState("");
-  const [region, setRegion] = useState<Region>("GLOBAL");
-  const questions: Question[] = QUESTION_SETS[region];
+  const [alreadyDecoded, setAlreadyDecoded] = useState(false);
+  const [isPremium, setIsPremium] = useState(false);
+  const [regenUsed, setRegenUsed] = useState(0);
 
+  // Watch auth state
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem(ONBOARDING_KEY);
-      if (saved) {
-        setProfile(JSON.parse(saved));
-        setOnboarded(true);
-      } else {
-        setOnboarded(false);
-      }
-    } catch {
-      setOnboarded(false);
-    }
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
+      setAuthed(!!session);
+    });
+    supabase.auth.getSession().then(({ data }) => setAuthed(!!data.session));
+    return () => sub.subscription.unsubscribe();
   }, []);
 
-  const completeOnboarding = (data: OnboardingData) => {
+  // After login: load profile + today's decode
+  useEffect(() => {
+    if (!authed) return;
+    (async () => {
+      const p = await loadProfile();
+      if (!p || !p.name || !p.dob) {
+        setNeedsOnboarding(true);
+      } else {
+        setProfile(p);
+        setNeedsOnboarding(false);
+        const t = await fetchToday();
+        setIsPremium(t.is_premium);
+        setRegenUsed(t.regenerations_used);
+        if (t.card) {
+          setCard(t.card);
+          setAlreadyDecoded(true);
+          setStep(4);
+          setStarted(true);
+        }
+      }
+    })().catch((e) => toast.error(e instanceof Error ? e.message : "Load failed"));
+  }, [authed]);
+
+  const completeOnboarding = async (data: OnboardingData) => {
     try {
-      localStorage.setItem(ONBOARDING_KEY, JSON.stringify({ ...data, completedAt: new Date().toISOString() }));
-    } catch {}
-    setProfile(data);
-    setOnboarded(true);
-    setStarted(true);
+      const loc = await detectLocation().catch(() => ({ region: "GLOBAL" as const }));
+      await saveProfile({ data: { ...data, region: loc.region } });
+      const p = await loadProfile();
+      setProfile(p);
+      setNeedsOnboarding(false);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't save profile");
+    }
   };
 
-  useEffect(() => {
-    let cancelled = false;
-    detectLocation().then((loc) => {
-      if (!cancelled) setRegion(loc.region);
-    }).catch(() => {});
-    return () => { cancelled = true; };
-  }, []);
+  const beginQuestions = async () => {
+    try {
+      const res = await fetchQs();
+      if (res.cycleReset) toast.success("You've unlocked a new question cycle 🔄");
+      setQuestions(res.questions);
+      setAnswers([]);
+      setStep(0);
+      setStarted(true);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't load questions");
+    }
+  };
 
   // Typewriter
   useEffect(() => {
@@ -88,23 +124,25 @@ function Index() {
     return () => clearInterval(id);
   }, [step]);
 
-  const runDecode = async (allAnswers: string[]) => {
+  const runDecode = async (allAnswers: typeof answers, force = false) => {
     setStep(3);
     try {
-      const result = await decode({
-        data: {
-          answers: questions.map((q, i) => ({ question: q.prompt, answer: allAnswers[i] })),
-          zodiac: profile?.zodiac || undefined,
-          name: profile?.name || undefined,
-        },
-      });
-      // Hold loading at least ~1.6s for drama
+      const result = await decode({ data: { answers: allAnswers, force } });
       setTimeout(() => {
-        setCard(result);
+        setCard(result.card);
+        setRegenUsed(result.regenerations_used);
+        setAlreadyDecoded(true);
         setStep(4);
       }, 1600);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Something went sideways.");
+      const msg = e instanceof Error ? e.message : "Decode failed";
+      if (msg.includes("DAILY_LIMIT")) {
+        toast.error("Your era is set for today. Come back tomorrow. 🌙");
+      } else if (msg.includes("REGEN_LIMIT")) {
+        toast.error("You've used your daily regeneration. 🌙");
+      } else {
+        toast.error(msg);
+      }
       setStep(2);
     }
   };
@@ -113,11 +151,11 @@ function Index() {
     if (selected || transitioning) return;
     setSelected(opt);
     const curStyle = Q_STYLES[step];
-    // glow phase, then transition
+    const q = questions[step];
     setTimeout(() => {
       setTransitioning(curStyle.transition);
       setTimeout(() => {
-        const nextAnswers = [...answers, opt];
+        const nextAnswers = [...answers, { question_id: q.id, question: q.question_text, answer: opt }];
         setAnswers(nextAnswers);
         setSelected(null);
         setTransitioning(null);
@@ -139,7 +177,7 @@ function Index() {
       localStorage.setItem(key, JSON.stringify(prev.slice(0, 50)));
       toast.success("Saved to your archive.");
     } catch {
-      toast.error("Couldn't save. Storage blocked.");
+      toast.error("Couldn't save.");
     }
   };
 
@@ -147,25 +185,26 @@ function Index() {
     if (!card) return;
     const text = `My current era: ${card.current_era}\n"${card.brutal_truth}"\n— decoded by era os`;
     try {
-      if (navigator.share) {
-        await navigator.share({ title: "My Era", text });
-      } else {
-        await navigator.clipboard.writeText(text);
-        toast.success("Copied to clipboard.");
-      }
-    } catch {
-      /* user cancelled */
-    }
+      if (navigator.share) await navigator.share({ title: "My Era", text });
+      else { await navigator.clipboard.writeText(text); toast.success("Copied."); }
+    } catch {}
   };
 
-  const reset = () => {
-    setCard(null);
-    setAnswers([]);
-    setSelected(null);
-    setStep(0);
-    setStarted(false);
-    router.invalidate();
+  const tryRegenerate = async () => {
+    if (!isPremium) {
+      toast.error("Your era is set for today. Come back tomorrow. 🌙");
+      return;
+    }
+    if (regenUsed >= 1) {
+      toast.error("You've used your daily regeneration. 🌙");
+      return;
+    }
+    await beginQuestions();
   };
+
+  if (authed === null) {
+    return <main className="h-[100dvh] w-full bg-black" />;
+  }
 
   return (
     <main className="relative h-[100dvh] w-full overflow-hidden text-white font-sans">
@@ -175,17 +214,14 @@ function Index() {
         href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;600;700;800;900&display=swap"
       />
 
-      {onboarded === false && (
-        <Onboarding onDone={completeOnboarding} />
+      {!authed && <Login />}
+      {authed && needsOnboarding && <Onboarding onDone={completeOnboarding} />}
+
+      {authed && !needsOnboarding && !started && (
+        <IntroScreen onStart={beginQuestions} profile={profile} />
       )}
 
-      {onboarded && !started && step === 0 && (
-        <IntroScreen onStart={() => setStarted(true)} />
-      )}
-      {/* profile saved for future personalization */}
-      {profile?.name ? null : null}
-
-      {started && step <= 2 && (
+      {authed && started && step <= 2 && questions[step] && (
         <QuestionScreen
           index={step}
           question={questions[step]}
@@ -198,7 +234,15 @@ function Index() {
       {step === 3 && <LoadingScreen typed={typed} />}
 
       {step === 4 && card && (
-        <ResultScreen card={card} onSave={onSave} onShare={onShare} onReset={reset} />
+        <ResultScreen
+          card={card}
+          onSave={onSave}
+          onShare={onShare}
+          onReset={tryRegenerate}
+          alreadyDecoded={alreadyDecoded}
+          isPremium={isPremium}
+          regenUsed={regenUsed}
+        />
       )}
     </main>
   );
@@ -207,50 +251,37 @@ function Index() {
 
 const MARQUEE_ITEMS = ["know your arc", "decode your era", "find your vibe", "trust the process"];
 
-function IntroScreen({ onStart }: { onStart: () => void }) {
+function IntroScreen({ onStart, profile }: { onStart: () => void; profile: any }) {
   return (
     <div className="absolute inset-0 overflow-hidden text-white" style={{ background: "var(--grad-hero)" }}>
-      {/* floating blobs */}
       <div className="blob float-slow" style={{ width: 320, height: 320, background: "#FF006E", top: -60, left: -80 }} />
       <div className="blob float-med" style={{ width: 280, height: 280, background: "#FFBE0B", bottom: -60, right: -60 }} />
       <div className="blob float-slow" style={{ width: 220, height: 220, background: "#8338EC", top: "40%", right: -40 }} />
       <div className="grain absolute inset-0 pointer-events-none" />
 
-      {/* scattered stars */}
-      <div className="absolute inset-0 pointer-events-none">
-        {[
-          { top: "12%", left: "78%", s: 6 },
-          { top: "22%", left: "18%", s: 4 },
-          { top: "36%", left: "62%", s: 5 },
-          { top: "52%", left: "8%", s: 3 },
-          { top: "62%", left: "84%", s: 4 },
-          { top: "70%", left: "30%", s: 6 },
-        ].map((d, i) => (
-          <div key={i} className="twinkle absolute rounded-full bg-white"
-            style={{ top: d.top, left: d.left, width: d.s, height: d.s, animationDelay: `${i * 0.3}s` }} />
-        ))}
-      </div>
-
       <div className="relative h-full flex flex-col px-6 pt-6 pb-7">
-        {/* logo */}
-        <div className="flex items-center gap-2.5">
-          <span className="inline-block w-4 h-4 rounded-full bg-[#FFBE0B] shadow-[0_0_18px_6px_rgba(255,190,11,0.55)] animate-pulse" />
-          <span className="text-lg font-bold tracking-tight lowercase text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.4)]">era os</span>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <span className="inline-block w-4 h-4 rounded-full bg-[#FFBE0B] shadow-[0_0_18px_6px_rgba(255,190,11,0.55)] animate-pulse" />
+            <span className="text-lg font-bold tracking-tight lowercase text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.4)]">era os</span>
+          </div>
+          <button
+            onClick={() => supabase.auth.signOut()}
+            className="text-[10px] tracking-[0.25em] uppercase text-white/60 hover:text-white"
+          >sign out</button>
         </div>
 
-        {/* headline */}
         <div className="mt-10">
           <h1 className="font-display text-[4.2rem] leading-[0.92] -tracking-[0.04em] text-shadow-pop">
+            <span className="block text-white">{profile?.name ? `HEY ${String(profile.name).split(" ")[0].toUpperCase()},` : "DECODE"}</span>
             <span className="block text-white">DECODE</span>
-            <span className="block text-white">YOUR</span>
-            <span className="block text-[#FFBE0B]">ERA.</span>
+            <span className="block text-[#FFBE0B]">YOUR ERA.</span>
           </h1>
           <p className="mt-5 text-base font-bold text-white max-w-[18rem] drop-shadow-[0_2px_4px_rgba(0,0,0,0.35)]">
             Three weird questions. One brutally honest card.
           </p>
         </div>
 
-        {/* marquee */}
         <div className="mt-6 marquee">
           <div className="inline-block rounded-full bg-black/55 px-5 py-2 backdrop-blur-sm border border-white/10 shadow-[0_4px_20px_rgba(0,0,0,0.3)]">
             <div className="marquee-track text-xs font-black uppercase tracking-[0.25em] text-white">
@@ -263,7 +294,6 @@ function IntroScreen({ onStart }: { onStart: () => void }) {
 
         <div className="mt-4" />
 
-        {/* button */}
         <button
           onClick={onStart}
           className="press animate-bounce-in w-full rounded-2xl py-7 font-display text-[1.8rem] uppercase tracking-wide text-white shadow-[0_0_30px_rgba(255,0,110,0.35),0_0_60px_rgba(131,56,236,0.25),6px_6px_0_0_#000]"
@@ -281,10 +311,7 @@ function ProgressDots({ index }: { index: number }) {
     <div className="absolute top-0 left-0 right-0 flex gap-1.5 px-4 pt-4 z-30">
       {[0, 1, 2].map((i) => (
         <div key={i} className="flex-1 h-1 rounded-full bg-black/20 overflow-hidden">
-          <div
-            className="h-full bg-black transition-all duration-500"
-            style={{ width: i < index ? "100%" : i === index ? "100%" : "0%" }}
-          />
+          <div className="h-full bg-black transition-all duration-500" style={{ width: i < index ? "100%" : i === index ? "100%" : "0%" }} />
         </div>
       ))}
     </div>
@@ -295,7 +322,7 @@ function QuestionScreen({
   index, question, selected, transitioning, onSelect,
 }: {
   index: number;
-  question: Question;
+  question: QuestionDTO;
   selected: string | null;
   transitioning: null | "liquid" | "glitch" | "fade";
   onSelect: (opt: string) => void;
@@ -322,7 +349,7 @@ function QuestionScreen({
         </div>
 
         <h2 className="font-display text-[2.4rem] leading-[1.02] -tracking-[0.03em] mb-auto">
-          {question.prompt}
+          {question.question_text}
         </h2>
 
         <div className="grid gap-3 mt-6">
@@ -361,29 +388,60 @@ function LoadingScreen({ typed }: { typed: string }) {
           {typed}
           <span className="inline-block w-[3px] h-7 bg-[#FFBE0B] ml-1 align-middle blink" />
         </div>
-        <div className="mt-6 text-[11px] tracking-[0.4em] uppercase text-white/40">
-          eraos · oracle
-        </div>
+        <div className="mt-6 text-[11px] tracking-[0.4em] uppercase text-white/40">eraos · oracle</div>
       </div>
     </div>
   );
 }
 
+function Countdown() {
+  const [str, setStr] = useState("");
+  useEffect(() => {
+    const tick = () => {
+      const now = new Date();
+      const tomorrow = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1, 0, 0, 0));
+      const ms = tomorrow.getTime() - now.getTime();
+      const h = Math.floor(ms / 3.6e6);
+      const m = Math.floor((ms % 3.6e6) / 6e4);
+      const s = Math.floor((ms % 6e4) / 1000);
+      setStr(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`);
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, []);
+  return <span className="font-mono">{str}</span>;
+}
+
 function ResultScreen({
-  card, onSave, onShare, onReset,
+  card, onSave, onShare, onReset, alreadyDecoded, isPremium, regenUsed,
 }: {
-  card: EraCardType; onSave: () => void; onShare: () => void; onReset: () => void;
+  card: EraCardType;
+  onSave: () => void;
+  onShare: () => void;
+  onReset: () => void;
+  alreadyDecoded: boolean;
+  isPremium: boolean;
+  regenUsed: number;
 }) {
+  const canRegen = isPremium && regenUsed < 1;
   return (
     <div className="absolute inset-0 overflow-hidden">
       <EraCard card={card} onSave={onSave} onShare={onShare} />
-      <button
-        onClick={onReset}
-        aria-label="Re-decode"
-        className="press absolute top-3 right-3 z-20 rounded-full bg-black/40 backdrop-blur-md border border-white/40 text-white text-[10px] font-black tracking-[0.25em] uppercase px-3 py-1.5"
-      >
-        ↻ redo
-      </button>
+
+      {alreadyDecoded && (
+        <div className="absolute top-3 left-3 z-20 rounded-full bg-black/55 backdrop-blur-md border border-white/30 text-white text-[10px] font-black tracking-[0.2em] uppercase px-3 py-1.5">
+          next decode in <Countdown />
+        </div>
+      )}
+
+      {canRegen && (
+        <button
+          onClick={onReset}
+          aria-label="Regenerate"
+          className="press absolute top-3 right-3 z-20 rounded-full bg-gradient-to-r from-[#FF006E] to-[#8338EC] border border-white/40 text-white text-[10px] font-black tracking-[0.2em] uppercase px-3 py-1.5"
+        >↻ regenerate (premium)</button>
+      )}
     </div>
   );
 }

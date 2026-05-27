@@ -1,14 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-
-const InputSchema = z.object({
-  answers: z.array(z.object({
-    question: z.string(),
-    answer: z.string(),
-  })).length(3),
-  zodiac: z.string().optional(),
-  name: z.string().optional(),
-});
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 const CHARACTERS = [
   "The Menace", "The Ghost", "The Delulu", "The Villain",
@@ -33,14 +25,119 @@ const CardSchema = z.object({
 
 export type EraCard = z.infer<typeof CardSchema>;
 
-export const decodeEra = createServerFn({ method: "POST" })
-  .inputValidator((input: unknown) => InputSchema.parse(input))
-  .handler(async ({ data }): Promise<EraCard> => {
+export type QuestionDTO = {
+  id: string;
+  question_text: string;
+  options: string[];
+};
+
+function todayUTC() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+/**
+ * Fetch 3 random unseen questions for the user's region.
+ * If all questions are exhausted, reset the seen list and return fresh 3.
+ */
+export const getDailyQuestions = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<{ questions: QuestionDTO[]; cycleReset: boolean; region: "GLOBAL" | "IN" }> => {
+    const { supabase, userId } = context;
+
+    // get region from profile
+    const { data: profile } = await supabase.from("profiles").select("region").eq("id", userId).maybeSingle();
+    const region = (profile?.region as "GLOBAL" | "IN") || "GLOBAL";
+
+    const { data: allQs, error: qErr } = await supabase
+      .from("questions").select("id, question_text, options").eq("region", region);
+    if (qErr) throw new Error(qErr.message);
+    if (!allQs || allQs.length === 0) throw new Error("No questions configured for region " + region);
+
+    const { data: seen } = await supabase
+      .from("user_questions_seen").select("question_id").eq("user_id", userId);
+    const seenIds = new Set((seen || []).map((s) => s.question_id));
+
+    let unseen = allQs.filter((q) => !seenIds.has(q.id));
+    let cycleReset = false;
+
+    if (unseen.length < 3) {
+      // reset
+      await supabase.from("user_questions_seen").delete().eq("user_id", userId);
+      unseen = allQs;
+      cycleReset = true;
+    }
+
+    // shuffle & take 3
+    const picked = [...unseen].sort(() => Math.random() - 0.5).slice(0, 3);
+    return { questions: picked as QuestionDTO[], cycleReset, region };
+  });
+
+/**
+ * Get today's existing decode if any.
+ */
+export const getTodayDecode = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<{ card: EraCard | null; regenerations_used: number; is_premium: boolean }> => {
+    const { supabase, userId } = context;
+    const { data: profile } = await supabase.from("profiles").select("is_premium").eq("id", userId).maybeSingle();
+    const { data } = await supabase
+      .from("daily_decodes").select("card, regenerations_used")
+      .eq("user_id", userId).eq("decode_date", todayUTC()).maybeSingle();
+    return {
+      card: (data?.card as EraCard) ?? null,
+      regenerations_used: data?.regenerations_used ?? 0,
+      is_premium: !!profile?.is_premium,
+    };
+  });
+
+const SubmitSchema = z.object({
+  answers: z.array(z.object({
+    question_id: z.string().uuid(),
+    question: z.string(),
+    answer: z.string(),
+  })).length(3),
+  force: z.boolean().optional(), // premium regenerate
+});
+
+/**
+ * Submit answers, mark seen, generate (or regenerate) today's card.
+ */
+export const submitDailyAnswers = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => SubmitSchema.parse(input))
+  .handler(async ({ data, context }): Promise<{ card: EraCard; regenerations_used: number }> => {
+    const { supabase, userId } = context;
     const apiKey = process.env.LOVABLE_API_KEY;
     if (!apiKey) throw new Error("LOVABLE_API_KEY not configured");
 
-    const zodiacLine = data.zodiac ? `\nZodiac sign: ${data.zodiac}` : "";
-    const nameLine = data.name ? `\nName: ${data.name}` : "";
+    const today = todayUTC();
+    const { data: profile } = await supabase
+      .from("profiles").select("name, zodiac, is_premium").eq("id", userId).maybeSingle();
+
+    const { data: existing } = await supabase
+      .from("daily_decodes").select("id, card, regenerations_used")
+      .eq("user_id", userId).eq("decode_date", today).maybeSingle();
+
+    if (existing) {
+      if (!data.force) {
+        // already decoded today, return existing
+        return { card: existing.card as EraCard, regenerations_used: existing.regenerations_used };
+      }
+      if (!profile?.is_premium) {
+        throw new Error("DAILY_LIMIT");
+      }
+      if (existing.regenerations_used >= 1) {
+        throw new Error("REGEN_LIMIT");
+      }
+    }
+
+    // mark seen (best-effort)
+    const seenRows = data.answers.map((a) => ({ user_id: userId, question_id: a.question_id }));
+    await supabase.from("user_questions_seen").upsert(seenRows, { onConflict: "user_id,question_id" });
+
+    // Generate card via Lovable AI
+    const zodiacLine = profile?.zodiac ? `\nZodiac sign: ${profile.zodiac}` : "";
+    const nameLine = profile?.name ? `\nName: ${profile.name}` : "";
 
     const prompt = `You are EraOS, a brutally funny, Gen Z oracle. Decode the user's CURRENT ERA. Be specific, weird, dramatic, and unhinged-but-poetic. Avoid clichés. No emojis in text fields.
 ${nameLine}${zodiacLine}
@@ -49,24 +146,21 @@ Answers:
 ${data.answers.map((a, i) => `${i + 1}. ${a.question}\n   -> ${a.answer}`).join("\n")}
 
 Return a Daily Era Card with:
-- current_era: 2-4 words, evocative (e.g. "Quiet Villain Arc")
+- current_era: 2-4 words, evocative
 - energy_match: hyper-specific funny comparison
 - brutal_truth: ONE sharp funny line
-- aura_color_name: invented color name (e.g. "Bruised Peach")
+- aura_color_name: invented color name
 - aura_color_hex: matching hex starting with #
 - todays_warning: 1 dramatic sentence
 - todays_power_move: 1 empowering sentence
 - emojis: exactly 3 emoji characters capturing the vibe
-- character_type: pick EXACTLY ONE from this list that fits today: ${CHARACTERS.join(", ")}
-- vibe_word: ONE punchy uppercase word (e.g. MENACE, DELULU, UNHINGED, HAUNTED, GOBLIN, CHAOTIC, FERAL, SOFT)
-- cosmic_prediction: 2-3 sentence prediction combining the user's zodiac energy with today's answers. Mystical, witty, oddly specific.`;
+- character_type: pick EXACTLY ONE from: ${CHARACTERS.join(", ")}
+- vibe_word: ONE punchy uppercase word
+- cosmic_prediction: 2-3 sentence prediction combining zodiac energy with today's answers. Mystical, witty, oddly specific.`;
 
     const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
-      headers: {
-        "Authorization": `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
+      headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         model: "google/gemini-3-flash-preview",
         messages: [{ role: "user", content: prompt }],
@@ -102,12 +196,51 @@ Return a Daily Era Card with:
     if (!res.ok) {
       const txt = await res.text();
       if (res.status === 429) throw new Error("Rate limited. Try again in a moment.");
-      if (res.status === 402) throw new Error("AI credits exhausted. Add credits in Workspace settings.");
-      throw new Error(`AI gateway error (${res.status}): ${txt.slice(0, 200)}`);
+      if (res.status === 402) throw new Error("AI credits exhausted.");
+      throw new Error(`AI error (${res.status}): ${txt.slice(0, 200)}`);
     }
-
     const json = await res.json();
     const args = json.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments;
     if (!args) throw new Error("No card returned from AI");
-    return CardSchema.parse(JSON.parse(args));
+    const card = CardSchema.parse(JSON.parse(args));
+
+    if (existing) {
+      const newCount = existing.regenerations_used + 1;
+      await supabase.from("daily_decodes").update({ card, regenerations_used: newCount }).eq("id", existing.id);
+      return { card, regenerations_used: newCount };
+    } else {
+      await supabase.from("daily_decodes").insert({ user_id: userId, decode_date: today, card, regenerations_used: 0 });
+      return { card, regenerations_used: 0 };
+    }
+  });
+
+/**
+ * Update profile after onboarding.
+ */
+const ProfileSchema = z.object({
+  name: z.string().min(1).max(80),
+  dob: z.string().min(4).max(20),
+  zodiac: z.string().max(40),
+  symbol: z.string().max(8),
+  region: z.enum(["GLOBAL", "IN"]),
+});
+
+export const upsertProfile = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => ProfileSchema.parse(input))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const { error } = await supabase.from("profiles").upsert({
+      id: userId, name: data.name, dob: data.dob, zodiac: data.zodiac, symbol: data.symbol, region: data.region,
+    });
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const getProfile = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context;
+    const { data } = await supabase.from("profiles").select("*").eq("id", userId).maybeSingle();
+    return data;
   });
