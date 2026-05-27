@@ -14,7 +14,125 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      daily_decodes: {
+        Row: {
+          card: Json
+          created_at: string
+          decode_date: string
+          id: string
+          regenerations_used: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          card: Json
+          created_at?: string
+          decode_date?: string
+          id?: string
+          regenerations_used?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          card?: Json
+          created_at?: string
+          decode_date?: string
+          id?: string
+          regenerations_used?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          dob: string | null
+          id: string
+          is_premium: boolean
+          name: string | null
+          region: string
+          symbol: string | null
+          updated_at: string
+          zodiac: string | null
+        }
+        Insert: {
+          created_at?: string
+          dob?: string | null
+          id: string
+          is_premium?: boolean
+          name?: string | null
+          region?: string
+          symbol?: string | null
+          updated_at?: string
+          zodiac?: string | null
+        }
+        Update: {
+          created_at?: string
+          dob?: string | null
+          id?: string
+          is_premium?: boolean
+          name?: string | null
+          region?: string
+          symbol?: string | null
+          updated_at?: string
+          zodiac?: string | null
+        }
+        Relationships: []
+      }
+      questions: {
+        Row: {
+          category: string | null
+          created_at: string
+          id: string
+          options: string[]
+          question_text: string
+          region: string
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string
+          id?: string
+          options: string[]
+          question_text: string
+          region: string
+        }
+        Update: {
+          category?: string | null
+          created_at?: string
+          id?: string
+          options?: string[]
+          question_text?: string
+          region?: string
+        }
+        Relationships: []
+      }
+      user_questions_seen: {
+        Row: {
+          question_id: string
+          seen_at: string
+          user_id: string
+        }
+        Insert: {
+          question_id: string
+          seen_at?: string
+          user_id: string
+        }
+        Update: {
+          question_id?: string
+          seen_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_questions_seen_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "questions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
