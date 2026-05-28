@@ -415,9 +415,10 @@ function Countdown() {
 }
 
 function ResultScreen({
-  card, onSave, onShare, onReset, alreadyDecoded, isPremium, regenUsed,
+  card, profile, onSave, onShare, onReset, alreadyDecoded, isPremium, regenUsed,
 }: {
   card: EraCardType;
+  profile: any;
   onSave: () => void;
   onShare: () => void;
   onReset: () => void;
@@ -428,7 +429,8 @@ function ResultScreen({
   const canRegen = isPremium && regenUsed < 1;
   return (
     <div className="absolute inset-0 overflow-hidden">
-      <EraCard card={card} onSave={onSave} onShare={onShare} />
+      <EraCard card={card} profile={profile} onSave={onSave} onShare={onShare} />
+
 
       {alreadyDecoded && (
         <div className="absolute top-3 left-3 z-20 rounded-full bg-black/55 backdrop-blur-md border border-white/30 text-white text-[10px] font-black tracking-[0.2em] uppercase px-3 py-1.5">
