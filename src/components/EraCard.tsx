@@ -20,27 +20,40 @@ const CHARACTER_EMOJI: Record<string, string> = {
   "The Feral": "🔥",
 };
 
-type GradientPair = { from: string; to: string; accent: string };
+type Gradient = { bg: string; from: string; to: string; accent: string };
 
-const GRADIENTS: Record<string, GradientPair> = {
-  "The Ghost":         { from: "#4A6B8A", to: "#0E2A33", accent: "#A8C4D6" },
-  "The Haunted":       { from: "#4A6B8A", to: "#0E2A33", accent: "#A8C4D6" },
-  "The Chaotic":       { from: "#FF1A8C", to: "#7A1FE0", accent: "#FFD400" },
-  "The Menace":        { from: "#FF1A8C", to: "#7A1FE0", accent: "#FFD400" },
-  "The Gremlin":       { from: "#FF1A8C", to: "#7A1FE0", accent: "#9BE15D" },
-  "The Feral":         { from: "#FF1A8C", to: "#7A1FE0", accent: "#FF5722" },
-  "The Villain":       { from: "#0E1538", to: "#7A0A1F", accent: "#FFD400" },
-  "The Romantic":      { from: "#FF7A5A", to: "#FFB347", accent: "#FFE0C2" },
-  "The Softlaunch":    { from: "#FF8FA3", to: "#FFC371", accent: "#FFE0C2" },
-  "The Delulu":        { from: "#9B5BE3", to: "#FF7AB6", accent: "#FFD1E8" },
-  "The Sage":          { from: "#6A48C7", to: "#1E1B4B", accent: "#B79EFF" },
-  "The Mystic":        { from: "#5B2A86", to: "#0F0C29", accent: "#C9A8FF" },
-  "The Overthinker":   { from: "#3F5BA9", to: "#1B2A55", accent: "#C3D7FF" },
-  "The Unbothered":    { from: "#1A8A82", to: "#0B3A45", accent: "#7FD9CC" },
-  "The Main Character":{ from: "#FF6F61", to: "#FFB347", accent: "#FFE066" },
+// All vibrant, loud, saturated — sibling to grad-hero (#FF006E → #8338EC → #FB5607 → #FFBE0B)
+const GRADIENTS: Record<string, Gradient> = {
+  // Haunted / Ghost — electric blue → deep purple (still vibrant, not dark navy)
+  "The Ghost":         { bg: "linear-gradient(135deg,#00C2FF 0%,#5B2EFF 50%,#B5179E 100%)", from: "#5B2EFF", to: "#00C2FF", accent: "#FFD400" },
+  "The Haunted":       { bg: "linear-gradient(135deg,#00C2FF 0%,#5B2EFF 50%,#B5179E 100%)", from: "#5B2EFF", to: "#00C2FF", accent: "#FFD400" },
+  // Villain — deep red → dark purple, still vivid
+  "The Villain":       { bg: "linear-gradient(135deg,#FF1744 0%,#9D0208 45%,#3A0CA3 100%)", from: "#FF1744", to: "#3A0CA3", accent: "#FFD400" },
+  // Soft / Romantic — coral → warm gold
+  "The Romantic":      { bg: "linear-gradient(135deg,#FF6F61 0%,#FF9E5E 45%,#FFD166 100%)", from: "#FF6F61", to: "#FFD166", accent: "#FFFFFF" },
+  "The Softlaunch":    { bg: "linear-gradient(135deg,#FF8FA3 0%,#FFB347 50%,#FFD166 100%)", from: "#FF8FA3", to: "#FFD166", accent: "#FFFFFF" },
+  // Delulu — purple → bubblegum pink
+  "The Delulu":        { bg: "linear-gradient(135deg,#9B5BE3 0%,#FF4FA3 55%,#FFB6E1 100%)", from: "#9B5BE3", to: "#FF4FA3", accent: "#FFD166" },
+  // Sage / Mystic — purple energy, still loud
+  "The Sage":          { bg: "linear-gradient(135deg,#7209B7 0%,#B5179E 50%,#FF006E 100%)", from: "#7209B7", to: "#FF006E", accent: "#FFD400" },
+  "The Mystic":        { bg: "linear-gradient(135deg,#7209B7 0%,#B5179E 50%,#FF006E 100%)", from: "#7209B7", to: "#FF006E", accent: "#FFD400" },
+  // Overthinker — electric blue → purple → magenta
+  "The Overthinker":   { bg: "linear-gradient(135deg,#3A86FF 0%,#8338EC 55%,#FF006E 100%)", from: "#3A86FF", to: "#FF006E", accent: "#FFD400" },
+  // Unbothered — teal → magenta (loud)
+  "The Unbothered":    { bg: "linear-gradient(135deg,#06D6A0 0%,#118AB2 50%,#8338EC 100%)", from: "#06D6A0", to: "#8338EC", accent: "#FFD166" },
+  // Main Character — full hero gradient
+  "The Main Character":{ bg: "linear-gradient(135deg,#FF006E 0%,#8338EC 38%,#FB5607 72%,#FFBE0B 100%)", from: "#FF006E", to: "#FFBE0B", accent: "#FFFFFF" },
+  // Chaotic / Menace / Gremlin / Feral — hot pink → electric purple → orange
+  "The Chaotic":       { bg: "linear-gradient(135deg,#FF006E 0%,#8338EC 50%,#FB5607 100%)", from: "#FF006E", to: "#FB5607", accent: "#FFD400" },
+  "The Menace":        { bg: "linear-gradient(135deg,#FF006E 0%,#8338EC 50%,#FB5607 100%)", from: "#FF006E", to: "#FB5607", accent: "#FFD400" },
+  "The Gremlin":       { bg: "linear-gradient(135deg,#FF006E 0%,#8338EC 50%,#9BE15D 100%)", from: "#FF006E", to: "#8338EC", accent: "#FFD400" },
+  "The Feral":         { bg: "linear-gradient(135deg,#FF006E 0%,#FB5607 55%,#FFBE0B 100%)", from: "#FF006E", to: "#FB5607", accent: "#FFD400" },
 };
 
-const DEFAULT_GRADIENT: GradientPair = { from: "#7A1FE0", to: "#FF1A8C", accent: "#FFD400" };
+const DEFAULT_GRADIENT: Gradient = {
+  bg: "linear-gradient(135deg,#FF006E 0%,#8338EC 38%,#FB5607 72%,#FFBE0B 100%)",
+  from: "#FF006E", to: "#FFBE0B", accent: "#FFFFFF",
+};
 
 const STARS = [
   { top: "6%", left: "10%", size: 10 },  { top: "11%", right: "12%", size: 7 },
