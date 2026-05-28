@@ -112,7 +112,7 @@ export const submitDailyAnswers = createServerFn({ method: "POST" })
 
     const today = todayUTC();
     const { data: profile } = await supabase
-      .from("profiles").select("name, zodiac, is_premium").eq("id", userId).maybeSingle();
+      .from("profiles").select("name, zodiac, is_premium, region").eq("id", userId).maybeSingle();
 
     const { data: existing } = await supabase
       .from("daily_decodes").select("id, card, regenerations_used")
@@ -120,27 +120,24 @@ export const submitDailyAnswers = createServerFn({ method: "POST" })
 
     if (existing) {
       if (!data.force) {
-        // already decoded today, return existing
         return { card: existing.card as EraCard, regenerations_used: existing.regenerations_used };
       }
-      if (!profile?.is_premium) {
-        throw new Error("DAILY_LIMIT");
-      }
-      if (existing.regenerations_used >= 1) {
-        throw new Error("REGEN_LIMIT");
-      }
+      if (!profile?.is_premium) throw new Error("DAILY_LIMIT");
+      if (existing.regenerations_used >= 1) throw new Error("REGEN_LIMIT");
     }
 
-    // mark seen (best-effort)
     const seenRows = data.answers.map((a) => ({ user_id: userId, question_id: a.question_id }));
     await supabase.from("user_questions_seen").upsert(seenRows, { onConflict: "user_id,question_id" });
 
-    // Generate card via Lovable AI
     const zodiacLine = profile?.zodiac ? `\nZodiac sign: ${profile.zodiac}` : "";
     const nameLine = profile?.name ? `\nName: ${profile.name}` : "";
+    const isIndia = profile?.region === "IN";
+    const langInstruction = isIndia
+      ? `\n\nLANGUAGE: User is from India (Delhi/North India). Write brutal_truth and cosmic_prediction in NATURAL Delhi Hinglish — code-switch mid-sentence like real people actually talk. Sprinkle "yaar", "bhai", "matlab", "seedha bol", "sach mein", "chal", "bas", "scene" organically. Mix Hindi (Roman script) into English naturally — DO NOT translate, just code-switch. Punchy, never forced. Other fields stay English.`
+      : "";
 
-    const prompt = `You are EraOS, a brutally funny, Gen Z oracle. Decode the user's CURRENT ERA. Be specific, weird, dramatic, and unhinged-but-poetic. Avoid clichés. No emojis in text fields.
-${nameLine}${zodiacLine}
+    const prompt = `You are EraOS, a brutally funny, Gen Z oracle. Decode the user's CURRENT ERA. Be specific, weird, dramatic, unhinged-but-poetic. Avoid clichés. No emojis in text fields.
+${nameLine}${zodiacLine}${langInstruction}
 
 Answers:
 ${data.answers.map((a, i) => `${i + 1}. ${a.question}\n   -> ${a.answer}`).join("\n")}
@@ -148,15 +145,15 @@ ${data.answers.map((a, i) => `${i + 1}. ${a.question}\n   -> ${a.answer}`).join(
 Return a Daily Era Card with:
 - current_era: 2-4 words, evocative
 - energy_match: hyper-specific funny comparison
-- brutal_truth: ONE sharp funny line
-- aura_color_name: invented color name
+- brutal_truth: ONE sharp funny line${isIndia ? " in Delhi Hinglish" : ""}
+- aura_color_name: invented color name (1-3 words)
 - aura_color_hex: matching hex starting with #
 - todays_warning: 1 dramatic sentence
 - todays_power_move: 1 empowering sentence
-- emojis: exactly 3 emoji characters capturing the vibe
+- emojis: exactly 3 emoji characters
 - character_type: pick EXACTLY ONE from: ${CHARACTERS.join(", ")}
 - vibe_word: ONE punchy uppercase word
-- cosmic_prediction: 2-3 sentence prediction combining zodiac energy with today's answers. Mystical, witty, oddly specific.`;
+- cosmic_prediction: MAX 2 short sentences. Sharp, specific, punchy${isIndia ? ", in Delhi Hinglish" : ""}. NOT a paragraph.`;
 
     const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
