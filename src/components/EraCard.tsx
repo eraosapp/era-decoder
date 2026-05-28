@@ -82,12 +82,12 @@ export function EraCard({
   return (
     <div
       className="absolute inset-0 flex flex-col text-white overflow-hidden"
-      style={{ background: `linear-gradient(160deg, ${g.from} 0%, ${g.to} 100%)` }}
+      style={{ background: g.bg }}
     >
-      {/* glow blobs */}
-      <div className="absolute -top-20 -left-20 w-80 h-80 rounded-full blur-3xl opacity-70 pointer-events-none" style={{ background: g.accent }} />
-      <div className="absolute -bottom-24 -right-20 w-96 h-96 rounded-full blur-3xl opacity-60 pointer-events-none" style={{ background: g.from }} />
-      <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-64 h-64 rounded-full blur-3xl opacity-30 pointer-events-none" style={{ background: g.accent }} />
+      {/* glow blobs — amp the vibrancy */}
+      <div className="absolute -top-24 -left-24 w-96 h-96 rounded-full blur-3xl opacity-70 pointer-events-none" style={{ background: g.accent }} />
+      <div className="absolute -bottom-28 -right-24 w-[26rem] h-[26rem] rounded-full blur-3xl opacity-70 pointer-events-none" style={{ background: g.from }} />
+      <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-72 h-72 rounded-full blur-3xl opacity-40 pointer-events-none" style={{ background: g.to }} />
 
       {/* stars */}
       {STARS.map((s, i) => (
@@ -113,20 +113,20 @@ export function EraCard({
           <span>daily card ●</span>
         </div>
 
-        {/* HERO: character + name */}
-        <div className="flex flex-col items-center gap-2 fade-up" style={{ animationDelay: "0.1s" }}>
+        {/* HERO: character poster */}
+        <div className="flex flex-col items-center gap-3 fade-up" style={{ animationDelay: "0.1s" }}>
           <div
             className="relative flex items-center justify-center rounded-full bob"
             style={{
-              width: 112, height: 112,
-              background: `radial-gradient(circle at 30% 30%, rgba(255,255,255,0.35), ${g.accent}aa 60%, ${g.from}cc 100%)`,
+              width: 120, height: 120,
+              background: `radial-gradient(circle at 30% 30%, rgba(255,255,255,0.4), ${g.accent}cc 55%, ${g.from}dd 100%)`,
               border: "3px solid rgba(255,255,255,0.95)",
-              boxShadow: `0 0 48px ${g.accent}, 0 14px 36px rgba(0,0,0,0.45), inset 0 -8px 18px rgba(0,0,0,0.2)`,
+              boxShadow: `0 0 56px ${g.accent}, 0 16px 40px rgba(0,0,0,0.45), inset 0 -8px 18px rgba(0,0,0,0.2)`,
             }}
           >
-            <span style={{ fontSize: 64, lineHeight: 1, filter: "drop-shadow(0 4px 8px rgba(0,0,0,0.4))" }}>{emoji}</span>
+            <span style={{ fontSize: 64, lineHeight: 1, filter: "drop-shadow(0 4px 8px rgba(0,0,0,0.45))" }}>{emoji}</span>
           </div>
-          <div className="text-center text-[11px] font-black uppercase tracking-[0.22em] text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.6)]">
+          <div className="text-center text-[11px] font-black uppercase tracking-[0.25em] text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.6)]">
             {character}
           </div>
         </div>
