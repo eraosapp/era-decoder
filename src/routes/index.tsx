@@ -236,6 +236,7 @@ function Index() {
       {step === 4 && card && (
         <ResultScreen
           card={card}
+          profile={profile}
           onSave={onSave}
           onShare={onShare}
           onReset={tryRegenerate}
