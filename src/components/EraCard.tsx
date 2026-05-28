@@ -134,7 +134,7 @@ export function EraCard({
         {/* VIBE + ERA + TRUTH */}
         <div className="flex flex-col items-center gap-2 text-center fade-up" style={{ animationDelay: "0.2s" }}>
           <div className="relative">
-            <div className="font-display text-[2.6rem] leading-[0.95] -tracking-[0.04em] text-white drop-shadow-[0_3px_12px_rgba(0,0,0,0.5)] break-words">
+            <div className="font-display text-[3.75rem] leading-[0.88] -tracking-[0.05em] text-white uppercase drop-shadow-[0_4px_14px_rgba(0,0,0,0.55)] break-words">
               {card.vibe_word}
             </div>
             <div className="absolute inset-0 shimmer-bg rounded-md pointer-events-none mix-blend-overlay" />
