@@ -45,12 +45,14 @@ function Index() {
 
   const [started, setStarted] = useState(false);
   const [step, setStep] = useState(0);
+  const [loadingQs, setLoadingQs] = useState(false);
   const [questions, setQuestions] = useState<QuestionDTO[]>([]);
   const [answers, setAnswers] = useState<{ question_id: string; question: string; answer: string }[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [transitioning, setTransitioning] = useState<null | "liquid" | "glitch" | "fade">(null);
   const [card, setCard] = useState<EraCardType | null>(null);
   const [typed, setTyped] = useState("");
+  const [readingTyped, setReadingTyped] = useState("");
   const [alreadyDecoded, setAlreadyDecoded] = useState(false);
   const [isPremium, setIsPremium] = useState(false);
   const [regenUsed, setRegenUsed] = useState(0);
