@@ -29,6 +29,7 @@ const Q_STYLES = [
 ] as const;
 
 const LOADING_TEXT = "decoding your chaos...";
+const READING_TEXT = "reading your world...";
 
 function Index() {
   const decode = useServerFn(submitDailyAnswers);
