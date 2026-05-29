@@ -43,7 +43,7 @@ export async function detectLocation(): Promise<LocationInfo> {
   // Try browser geolocation first (silent — only resolves if permission granted)
   const geo = await new Promise<{ lat: number; lon: number } | null>((resolve) => {
     if (typeof navigator === "undefined" || !navigator.geolocation) return resolve(null);
-    const timeout = setTimeout(() => resolve(null), 2500);
+    const timeout = setTimeout(() => resolve(null), 4000);
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         clearTimeout(timeout);
@@ -53,7 +53,7 @@ export async function detectLocation(): Promise<LocationInfo> {
         clearTimeout(timeout);
         resolve(null);
       },
-      { timeout: 2500, maximumAge: 60 * 60 * 1000 },
+      { timeout: 4000, maximumAge: 60 * 60 * 1000 },
     );
   });
 
@@ -61,5 +61,15 @@ export async function detectLocation(): Promise<LocationInfo> {
   if (geo) loc = await reverseGeocode(geo.lat, geo.lon);
   if (!loc.country) loc = { ...(await ipFallback()), ...loc };
 
-  return { region: regionFor(loc.country), country: loc.country, city: loc.city };
+  const info: LocationInfo = { region: regionFor(loc.country), country: loc.country, city: loc.city };
+  try { localStorage.setItem("eraos.location", JSON.stringify(info)); } catch {}
+  return info;
+}
+
+export function getCachedLocation(): LocationInfo | null {
+  try {
+    const raw = localStorage.getItem("eraos.location");
+    if (!raw) return null;
+    return JSON.parse(raw) as LocationInfo;
+  } catch { return null; }
 }

@@ -6,7 +6,7 @@ import {
   submitDailyAnswers, getDailyQuestions, getTodayDecode, upsertProfile, getProfile,
   type EraCard as EraCardType, type QuestionDTO,
 } from "@/lib/era.functions";
-import { detectLocation } from "@/lib/location";
+import { detectLocation, getCachedLocation } from "@/lib/location";
 import { EraCard } from "@/components/EraCard";
 import { Onboarding, type OnboardingData } from "@/components/Onboarding";
 import { Login } from "@/components/Login";
@@ -29,6 +29,7 @@ const Q_STYLES = [
 ] as const;
 
 const LOADING_TEXT = "decoding your chaos...";
+const READING_TEXT = "reading your world...";
 
 function Index() {
   const decode = useServerFn(submitDailyAnswers);
@@ -44,12 +45,14 @@ function Index() {
 
   const [started, setStarted] = useState(false);
   const [step, setStep] = useState(0);
+  const [loadingQs, setLoadingQs] = useState(false);
   const [questions, setQuestions] = useState<QuestionDTO[]>([]);
   const [answers, setAnswers] = useState<{ question_id: string; question: string; answer: string }[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [transitioning, setTransitioning] = useState<null | "liquid" | "glitch" | "fade">(null);
   const [card, setCard] = useState<EraCardType | null>(null);
   const [typed, setTyped] = useState("");
+  const [readingTyped, setReadingTyped] = useState("");
   const [alreadyDecoded, setAlreadyDecoded] = useState(false);
   const [isPremium, setIsPremium] = useState(false);
   const [regenUsed, setRegenUsed] = useState(0);
@@ -99,17 +102,41 @@ function Index() {
   };
 
   const beginQuestions = async () => {
+    setLoadingQs(true);
+    setStarted(true);
     try {
-      const res = await fetchQs();
-      if (res.cycleReset) toast.success("You've unlocked a new question cycle 🔄");
+      // try cached location first for speed, then refresh in background
+      let loc = getCachedLocation();
+      if (!loc?.city) {
+        loc = await detectLocation().catch(() => null);
+      }
+      const res = await fetchQs({ data: { city: loc?.city, country: loc?.country } });
       setQuestions(res.questions);
       setAnswers([]);
       setStep(0);
-      setStarted(true);
+      setLoadingQs(false);
     } catch (e) {
+      setLoadingQs(false);
+      setStarted(false);
       toast.error(e instanceof Error ? e.message : "Couldn't load questions");
     }
   };
+
+  // Typewriter — "reading your world..." while questions generate
+  useEffect(() => {
+    if (!loadingQs) return;
+    setReadingTyped("");
+    let i = 0;
+    const id = setInterval(() => {
+      i++;
+      setReadingTyped(READING_TEXT.slice(0, i));
+      if (i >= READING_TEXT.length) {
+        // loop the typing for that "still thinking" feel
+        setTimeout(() => { i = 0; setReadingTyped(""); }, 900);
+      }
+    }, 70);
+    return () => clearInterval(id);
+  }, [loadingQs]);
 
   // Typewriter
   useEffect(() => {
@@ -221,7 +248,11 @@ function Index() {
         <IntroScreen onStart={beginQuestions} profile={profile} />
       )}
 
-      {authed && started && step <= 2 && questions[step] && (
+      {authed && started && loadingQs && (
+        <LoadingScreen typed={readingTyped} sublabel="eraos · reading the room" />
+      )}
+
+      {authed && started && !loadingQs && step <= 2 && questions[step] && (
         <QuestionScreen
           index={step}
           question={questions[step]}
@@ -231,7 +262,7 @@ function Index() {
         />
       )}
 
-      {step === 3 && <LoadingScreen typed={typed} />}
+      {step === 3 && !loadingQs && <LoadingScreen typed={typed} sublabel="eraos · oracle" />}
 
       {step === 4 && card && (
         <ResultScreen
@@ -381,7 +412,7 @@ function QuestionScreen({
   );
 }
 
-function LoadingScreen({ typed }: { typed: string }) {
+function LoadingScreen({ typed, sublabel = "eraos · oracle" }: { typed: string; sublabel?: string }) {
   return (
     <div className="absolute inset-0 bg-black flex items-center justify-center px-6 anim-fade-in-slow">
       <div className="text-center">
@@ -389,7 +420,7 @@ function LoadingScreen({ typed }: { typed: string }) {
           {typed}
           <span className="inline-block w-[3px] h-7 bg-[#FFBE0B] ml-1 align-middle blink" />
         </div>
-        <div className="mt-6 text-[11px] tracking-[0.4em] uppercase text-white/40">eraos · oracle</div>
+        <div className="mt-6 text-[11px] tracking-[0.4em] uppercase text-white/40">{sublabel}</div>
       </div>
     </div>
   );
