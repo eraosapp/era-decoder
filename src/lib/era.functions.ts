@@ -35,41 +35,194 @@ function todayUTC() {
   return new Date().toISOString().slice(0, 10);
 }
 
+// ---------- helpers for AI question generation ----------
+
+function ageFromDob(dob?: string | null): number | null {
+  if (!dob) return null;
+  const d = new Date(dob);
+  if (isNaN(d.getTime())) return null;
+  const diff = Date.now() - d.getTime();
+  return Math.floor(diff / (365.25 * 24 * 3600 * 1000));
+}
+
+function moonPhase(): string {
+  // synodic month calc anchored at known new moon 2000-01-06 18:14 UTC
+  const synodic = 29.53058867;
+  const anchor = Date.UTC(2000, 0, 6, 18, 14) / 86400000;
+  const today = Date.now() / 86400000;
+  const phase = (((today - anchor) % synodic) + synodic) % synodic;
+  if (phase < 1.84) return "new moon";
+  if (phase < 5.53) return "waxing crescent";
+  if (phase < 9.22) return "first quarter";
+  if (phase < 12.91) return "waxing gibbous";
+  if (phase < 16.61) return "full moon";
+  if (phase < 20.30) return "waning gibbous";
+  if (phase < 23.99) return "last quarter";
+  return "waning crescent";
+}
+
+async function fetchTrending(city?: string | null): Promise<string[]> {
+  if (!city) return [];
+  try {
+    const q = encodeURIComponent(`${city} events this week`);
+    const url = `https://news.google.com/rss/search?q=${q}&hl=en&gl=IN&ceid=IN:en`;
+    const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
+    if (!res.ok) return [];
+    const xml = await res.text();
+    const titles: string[] = [];
+    const re = /<title><!\[CDATA\[(.*?)\]\]><\/title>|<title>(.*?)<\/title>/g;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(xml)) && titles.length < 6) {
+      const t = (m[1] || m[2] || "").trim();
+      if (t && !t.toLowerCase().startsWith("google news")) titles.push(t);
+    }
+    return titles.slice(0, 5);
+  } catch {
+    return [];
+  }
+}
+
+const QGenSchema = z.object({
+  questions: z.array(z.object({
+    question_text: z.string().min(4).max(220),
+    options: z.array(z.string().min(1).max(140)).length(4),
+  })).length(3),
+});
+
+const QInputSchema = z.object({
+  city: z.string().max(80).optional(),
+  country: z.string().max(8).optional(),
+}).optional();
+
 /**
- * Fetch 3 random unseen questions for the user's region.
- * If all questions are exhausted, reset the seen list and return fresh 3.
+ * Generate 3 hyper-personalised questions using Gemini, based on:
+ * - user age (from DOB), region, zodiac
+ * - city + trending events this week
+ * - current date, day of week, moon phase
  */
 export const getDailyQuestions = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }): Promise<{ questions: QuestionDTO[]; cycleReset: boolean; region: "GLOBAL" | "IN" }> => {
+  .inputValidator((input: unknown) => QInputSchema.parse(input))
+  .handler(async ({ data, context }): Promise<{ questions: QuestionDTO[]; cycleReset: boolean; region: "GLOBAL" | "IN" }> => {
     const { supabase, userId } = context;
+    const apiKey = process.env.LOVABLE_API_KEY;
+    if (!apiKey) throw new Error("LOVABLE_API_KEY not configured");
 
-    // get region from profile
-    const { data: profile } = await supabase.from("profiles").select("region").eq("id", userId).maybeSingle();
+    const { data: profile } = await supabase
+      .from("profiles").select("region, dob, zodiac, name").eq("id", userId).maybeSingle();
     const region = (profile?.region as "GLOBAL" | "IN") || "GLOBAL";
+    const age = ageFromDob(profile?.dob);
+    const city = data?.city?.trim() || null;
+    const country = data?.country?.trim() || (region === "IN" ? "IN" : null);
 
-    const { data: allQs, error: qErr } = await supabase
-      .from("questions").select("id, question_text, options").eq("region", region);
-    if (qErr) throw new Error(qErr.message);
-    if (!allQs || allQs.length === 0) throw new Error("No questions configured for region " + region);
+    const now = new Date();
+    const dayOfWeek = now.toLocaleDateString("en-US", { weekday: "long" });
+    const dateStr = now.toISOString().slice(0, 10);
+    const moon = moonPhase();
+    const trending = await fetchTrending(city);
 
-    const { data: seen } = await supabase
-      .from("user_questions_seen").select("question_id").eq("user_id", userId);
-    const seenIds = new Set((seen || []).map((s) => s.question_id));
-
-    let unseen = allQs.filter((q) => !seenIds.has(q.id));
-    let cycleReset = false;
-
-    if (unseen.length < 3) {
-      // reset
-      await supabase.from("user_questions_seen").delete().eq("user_id", userId);
-      unseen = allQs;
-      cycleReset = true;
+    const isIndia = region === "IN";
+    let ageBucket = "general adult";
+    if (age != null) {
+      if (age <= 18) ageBucket = "16-18 (school: exams, curfew, first crush, parents)";
+      else if (age <= 21) ageBucket = "18-21 (college, hostel life, heartbreak, placements)";
+      else if (age <= 24) ageBucket = "21-24 (first job, quarter-life crisis, salary vs passion)";
+      else if (age <= 27) ageBucket = isIndia
+        ? "24-27 India (marriage pressure, log kya kahenge, career vs family, settle down talk, money anxiety, comparison with cousins)"
+        : "24-27 (career grind, relationship questions, comparison)";
+      else if (age <= 32) ageBucket = "27-32 (therapy talk, career pivot, 'where did time go', friends drifting)";
+      else ageBucket = `${age} (life check-ins, what matters now)`;
     }
 
-    // shuffle & take 3
-    const picked = [...unseen].sort(() => Math.random() - 0.5).slice(0, 3);
-    return { questions: picked as QuestionDTO[], cycleReset, region };
+    const langLine = isIndia
+      ? `LANGUAGE: Natural Delhi/North-India Hinglish — code-switch mid-sentence the way people actually talk. Sprinkle "yaar", "bhai", "matlab", "scene", "literally", "bas", "chal" organically. Never translate; code-switch. Options must be embarrassingly specific and feel like a roast from their best friend.`
+      : `LANGUAGE: English, Gen Z tone — sharp, dry, terminally online. Options should be embarrassingly specific.`;
+
+    const trendingLine = trending.length
+      ? `Trending in ${city} this week:\n${trending.map((t) => `- ${t}`).join("\n")}`
+      : "";
+
+    const prompt = `You are EraOS — generate 3 hyper-personalised daily questions for this user.
+
+USER CONTEXT:
+- Name: ${profile?.name || "friend"}
+- Age bucket: ${ageBucket}
+- Region: ${region}${country ? ` (${country})` : ""}
+- City: ${city || "unknown"}
+- Zodiac: ${profile?.zodiac || "unknown"}
+- Date: ${dateStr} (${dayOfWeek})
+- Moon phase: ${moon}
+${trendingLine}
+
+${langLine}
+
+RULES:
+- Exactly 3 questions, each with exactly 4 options.
+- At least ONE question must reference something REAL happening in ${city || "their city"} this week or the current day/moon/weekend energy. Not generic "how are you feeling".
+- Questions feel like the user's best friend texting them — casual, specific, knowing.
+- Options must be embarrassingly accurate — the kind of thing they'd react to with "stop reading my mind".
+- NO multiple choice that's morally loaded or judgemental. NO "self-help" tone.
+- Match the age-bucket themes above. Don't ask a 27-year-old about exams or an 18-year-old about marriage.
+- Keep questions under 18 words. Options under 14 words.
+- No emojis inside questions or options.
+- Return ONLY via the tool call.`;
+
+    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "google/gemini-3-flash-preview",
+        messages: [{ role: "user", content: prompt }],
+        tools: [{
+          type: "function",
+          function: {
+            name: "return_questions",
+            description: "Return 3 daily questions",
+            parameters: {
+              type: "object",
+              properties: {
+                questions: {
+                  type: "array",
+                  minItems: 3,
+                  maxItems: 3,
+                  items: {
+                    type: "object",
+                    properties: {
+                      question_text: { type: "string" },
+                      options: { type: "array", items: { type: "string" }, minItems: 4, maxItems: 4 },
+                    },
+                    required: ["question_text", "options"],
+                    additionalProperties: false,
+                  },
+                },
+              },
+              required: ["questions"],
+              additionalProperties: false,
+            },
+          },
+        }],
+        tool_choice: { type: "function", function: { name: "return_questions" } },
+      }),
+    });
+
+    if (!res.ok) {
+      const txt = await res.text();
+      if (res.status === 429) throw new Error("Rate limited. Try again in a moment.");
+      if (res.status === 402) throw new Error("AI credits exhausted.");
+      throw new Error(`AI error (${res.status}): ${txt.slice(0, 200)}`);
+    }
+    const json = await res.json();
+    const args = json.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments;
+    if (!args) throw new Error("No questions returned from AI");
+    const parsed = QGenSchema.parse(JSON.parse(args));
+
+    const questions: QuestionDTO[] = parsed.questions.map((q) => ({
+      id: crypto.randomUUID(),
+      question_text: q.question_text,
+      options: q.options,
+    }));
+
+    return { questions, cycleReset: false, region };
   });
 
 /**
