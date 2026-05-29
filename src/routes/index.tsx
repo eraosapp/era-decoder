@@ -102,17 +102,41 @@ function Index() {
   };
 
   const beginQuestions = async () => {
+    setLoadingQs(true);
+    setStarted(true);
     try {
-      const res = await fetchQs();
-      if (res.cycleReset) toast.success("You've unlocked a new question cycle 🔄");
+      // try cached location first for speed, then refresh in background
+      let loc = getCachedLocation();
+      if (!loc?.city) {
+        loc = await detectLocation().catch(() => null);
+      }
+      const res = await fetchQs({ data: { city: loc?.city, country: loc?.country } });
       setQuestions(res.questions);
       setAnswers([]);
       setStep(0);
-      setStarted(true);
+      setLoadingQs(false);
     } catch (e) {
+      setLoadingQs(false);
+      setStarted(false);
       toast.error(e instanceof Error ? e.message : "Couldn't load questions");
     }
   };
+
+  // Typewriter — "reading your world..." while questions generate
+  useEffect(() => {
+    if (!loadingQs) return;
+    setReadingTyped("");
+    let i = 0;
+    const id = setInterval(() => {
+      i++;
+      setReadingTyped(READING_TEXT.slice(0, i));
+      if (i >= READING_TEXT.length) {
+        // loop the typing for that "still thinking" feel
+        setTimeout(() => { i = 0; setReadingTyped(""); }, 900);
+      }
+    }, 70);
+    return () => clearInterval(id);
+  }, [loadingQs]);
 
   // Typewriter
   useEffect(() => {
