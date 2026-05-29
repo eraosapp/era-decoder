@@ -252,11 +252,11 @@ function SlideCharacter({ bg, emoji, character, era }: { bg: string; emoji: stri
           <span style={{ fontSize: 160, lineHeight: 1, filter: "drop-shadow(0 6px 12px rgba(0,0,0,0.45))" }}>{emoji}</span>
         </div>
         <div className="text-center">
-          <div className="font-display text-white uppercase leading-none -tracking-[0.03em]"
-               style={{ fontSize: "clamp(2.4rem, 10vw, 3.6rem)" }}>
+          <div className="font-display text-white uppercase leading-none -tracking-[0.03em] break-words"
+               style={{ fontSize: "clamp(2.4rem, 10vw, 3.6rem)", maxWidth: "100%" }}>
             {character}
           </div>
-          <div className="mt-4 text-white/90 font-black uppercase tracking-[0.4em] text-[11px]">
+          <div className="mt-4 text-white/90 font-black uppercase tracking-[0.4em] text-[11px] break-words max-w-full">
             {era}
           </div>
         </div>
@@ -275,7 +275,7 @@ function SlideTruth({ truth, name }: { truth: string; name: string }) {
            style={{ background: "radial-gradient(ellipse at center, rgba(255,0,110,0.18), transparent 70%)" }} />
       <div className="absolute inset-0 flex flex-col items-center justify-center px-7 text-center">
         <p
-          className="font-display text-white leading-[1.05] -tracking-[0.03em]"
+          className="font-display text-white leading-[1.05] -tracking-[0.03em] break-words max-w-full"
           style={{ fontSize: "clamp(1.9rem, 7vw, 2.6rem)" }}
         >
           <span className="text-[#FF006E] font-display align-top mr-1" style={{ fontSize: "1.4em" }}>“</span>
@@ -339,8 +339,8 @@ function SlideCosmic({ symbol, prediction }: { symbol: string; prediction: strin
           {symbol}
         </div>
         <p
-          className="font-display text-white leading-[1.15] -tracking-[0.02em] max-w-[24rem]"
-          style={{ fontSize: "clamp(1.4rem, 5.2vw, 1.9rem)" }}
+          className="font-display text-white leading-[1.15] -tracking-[0.02em] break-words w-full"
+          style={{ fontSize: "clamp(1.4rem, 5.2vw, 1.9rem)", maxWidth: "24rem" }}
         >
           {prediction}
         </p>
