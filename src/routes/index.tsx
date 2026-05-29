@@ -248,7 +248,11 @@ function Index() {
         <IntroScreen onStart={beginQuestions} profile={profile} />
       )}
 
-      {authed && started && step <= 2 && questions[step] && (
+      {authed && started && loadingQs && (
+        <LoadingScreen typed={readingTyped} sublabel="eraos · reading the room" />
+      )}
+
+      {authed && started && !loadingQs && step <= 2 && questions[step] && (
         <QuestionScreen
           index={step}
           question={questions[step]}
@@ -258,7 +262,7 @@ function Index() {
         />
       )}
 
-      {step === 3 && <LoadingScreen typed={typed} />}
+      {step === 3 && !loadingQs && <LoadingScreen typed={typed} sublabel="eraos · oracle" />}
 
       {step === 4 && card && (
         <ResultScreen
