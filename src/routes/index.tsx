@@ -412,7 +412,7 @@ function QuestionScreen({
   );
 }
 
-function LoadingScreen({ typed }: { typed: string }) {
+function LoadingScreen({ typed, sublabel = "eraos · oracle" }: { typed: string; sublabel?: string }) {
   return (
     <div className="absolute inset-0 bg-black flex items-center justify-center px-6 anim-fade-in-slow">
       <div className="text-center">
@@ -420,7 +420,7 @@ function LoadingScreen({ typed }: { typed: string }) {
           {typed}
           <span className="inline-block w-[3px] h-7 bg-[#FFBE0B] ml-1 align-middle blink" />
         </div>
-        <div className="mt-6 text-[11px] tracking-[0.4em] uppercase text-white/40">eraos · oracle</div>
+        <div className="mt-6 text-[11px] tracking-[0.4em] uppercase text-white/40">{sublabel}</div>
       </div>
     </div>
   );
