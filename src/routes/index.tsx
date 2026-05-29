@@ -6,7 +6,7 @@ import {
   submitDailyAnswers, getDailyQuestions, getTodayDecode, upsertProfile, getProfile,
   type EraCard as EraCardType, type QuestionDTO,
 } from "@/lib/era.functions";
-import { detectLocation } from "@/lib/location";
+import { detectLocation, getCachedLocation } from "@/lib/location";
 import { EraCard } from "@/components/EraCard";
 import { Onboarding, type OnboardingData } from "@/components/Onboarding";
 import { Login } from "@/components/Login";
