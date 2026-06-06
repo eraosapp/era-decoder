@@ -1,15 +1,17 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast, Toaster } from "sonner";
 import {
   submitDailyAnswers, getDailyQuestions, getTodayDecode, upsertProfile, getProfile,
+  getUsageStats, getStreak, getYesterdayForFeedback, submitFeedback, createBattle,
   type EraCard as EraCardType, type QuestionDTO,
 } from "@/lib/era.functions";
 import { detectLocation, getCachedLocation } from "@/lib/location";
 import { EraCard } from "@/components/EraCard";
 import { Onboarding, type OnboardingData } from "@/components/Onboarding";
 import { Login } from "@/components/Login";
+import { AnimatedBg, BlobLayer } from "@/components/AnimatedBg";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/")({
@@ -23,9 +25,9 @@ export const Route = createFileRoute("/")({
 });
 
 const Q_STYLES = [
-  { bg: "#CCFF00", text: "text-black", accent: "#000", transition: "liquid" },
-  { bg: "#FF4D6D", text: "text-white", accent: "#fff", transition: "glitch" },
-  { bg: "#00B4D8", text: "text-white", accent: "#fff", transition: "fade" },
+  { bg: "#CCFF00", text: "text-black", accent: "#000", transition: "liquid", blobs: ["#00B4D8", "#FF4D6D"] },
+  { bg: "#FF4D6D", text: "text-white", accent: "#fff", transition: "glitch", blobs: ["#8338EC", "#FFBE0B"] },
+  { bg: "#00B4D8", text: "text-white", accent: "#fff", transition: "fade",   blobs: ["#FF006E", "#FFBE0B"] },
 ] as const;
 
 const LOADING_TEXT = "decoding your chaos...";
@@ -37,6 +39,11 @@ function Index() {
   const fetchToday = useServerFn(getTodayDecode);
   const saveProfile = useServerFn(upsertProfile);
   const loadProfile = useServerFn(getProfile);
+  const loadStats = useServerFn(getUsageStats);
+  const loadStreak = useServerFn(getStreak);
+  const loadYesterday = useServerFn(getYesterdayForFeedback);
+  const sendFeedback = useServerFn(submitFeedback);
+  const startBattle = useServerFn(createBattle);
   const router = useRouter();
 
   const [authed, setAuthed] = useState<boolean | null>(null);
@@ -57,16 +64,17 @@ function Index() {
   const [isPremium, setIsPremium] = useState(false);
   const [regenUsed, setRegenUsed] = useState(0);
 
-  // Watch auth state
+  const [stats, setStats] = useState<{ today: number; total: number } | null>(null);
+  const [streak, setStreak] = useState<{ streak: number; broken: boolean } | null>(null);
+  const [yesterday, setYesterday] = useState<{ id: string; warning: string; era_name: string; brutal_truth: string } | null>(null);
+  const [feedbackDone, setFeedbackDone] = useState(false);
+
   useEffect(() => {
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
-      setAuthed(!!session);
-    });
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => setAuthed(!!session));
     supabase.auth.getSession().then(({ data }) => setAuthed(!!data.session));
     return () => sub.subscription.unsubscribe();
   }, []);
 
-  // After login: load profile + today's decode
   useEffect(() => {
     if (!authed) return;
     (async () => {
@@ -76,9 +84,11 @@ function Index() {
       } else {
         setProfile(p);
         setNeedsOnboarding(false);
-        const t = await fetchToday();
+        const [t, s, y] = await Promise.all([fetchToday(), loadStreak(), loadYesterday()]);
         setIsPremium(t.is_premium);
         setRegenUsed(t.regenerations_used);
+        setStreak(s);
+        setYesterday(y);
         if (t.card) {
           setCard(t.card);
           setAlreadyDecoded(true);
@@ -88,6 +98,11 @@ function Index() {
       }
     })().catch((e) => toast.error(e instanceof Error ? e.message : "Load failed"));
   }, [authed]);
+
+  // Public stats — load once
+  useEffect(() => {
+    loadStats().then(setStats).catch(() => {});
+  }, []);
 
   const completeOnboarding = async (data: OnboardingData) => {
     try {
@@ -105,11 +120,8 @@ function Index() {
     setLoadingQs(true);
     setStarted(true);
     try {
-      // try cached location first for speed, then refresh in background
       let loc = getCachedLocation();
-      if (!loc?.city) {
-        loc = await detectLocation().catch(() => null);
-      }
+      if (!loc?.city) loc = await detectLocation().catch(() => null);
       const res = await fetchQs({ data: { city: loc?.city, country: loc?.country } });
       setQuestions(res.questions);
       setAnswers([]);
@@ -122,7 +134,6 @@ function Index() {
     }
   };
 
-  // Typewriter — "reading your world..." while questions generate
   useEffect(() => {
     if (!loadingQs) return;
     setReadingTyped("");
@@ -130,15 +141,11 @@ function Index() {
     const id = setInterval(() => {
       i++;
       setReadingTyped(READING_TEXT.slice(0, i));
-      if (i >= READING_TEXT.length) {
-        // loop the typing for that "still thinking" feel
-        setTimeout(() => { i = 0; setReadingTyped(""); }, 900);
-      }
+      if (i >= READING_TEXT.length) setTimeout(() => { i = 0; setReadingTyped(""); }, 900);
     }, 70);
     return () => clearInterval(id);
   }, [loadingQs]);
 
-  // Typewriter
   useEffect(() => {
     if (step !== 3) return;
     setTyped("");
@@ -154,22 +161,21 @@ function Index() {
   const runDecode = async (allAnswers: typeof answers, force = false) => {
     setStep(3);
     try {
-      const result = await decode({ data: { answers: allAnswers, force } });
+      const loc = getCachedLocation();
+      const result = await decode({ data: { answers: allAnswers, force, city: loc?.city } });
       setTimeout(() => {
         setCard(result.card);
         setRegenUsed(result.regenerations_used);
         setAlreadyDecoded(true);
         setStep(4);
+        loadStats().then(setStats).catch(() => {});
+        loadStreak().then(setStreak).catch(() => {});
       }, 1600);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Decode failed";
-      if (msg.includes("DAILY_LIMIT")) {
-        toast.error("Your era is set for today. Come back tomorrow. 🌙");
-      } else if (msg.includes("REGEN_LIMIT")) {
-        toast.error("You've used your daily regeneration. 🌙");
-      } else {
-        toast.error(msg);
-      }
+      if (msg.includes("DAILY_LIMIT")) toast.error("Your era is set for today. Come back tomorrow. 🌙");
+      else if (msg.includes("REGEN_LIMIT")) toast.error("You've used your daily regeneration. 🌙");
+      else toast.error(msg);
       setStep(2);
     }
   };
@@ -186,11 +192,8 @@ function Index() {
         setAnswers(nextAnswers);
         setSelected(null);
         setTransitioning(null);
-        if (step < 2) {
-          setStep(step + 1);
-        } else {
-          runDecode(nextAnswers);
-        }
+        if (step < 2) setStep(step + 1);
+        else runDecode(nextAnswers);
       }, 700);
     }, 500);
   };
@@ -203,9 +206,7 @@ function Index() {
       prev.unshift({ ...card, savedAt: new Date().toISOString() });
       localStorage.setItem(key, JSON.stringify(prev.slice(0, 50)));
       toast.success("Saved to your archive.");
-    } catch {
-      toast.error("Couldn't save.");
-    }
+    } catch { toast.error("Couldn't save."); }
   };
 
   const onShare = async () => {
@@ -217,35 +218,55 @@ function Index() {
     } catch {}
   };
 
+  const onBattle = async () => {
+    try {
+      toast.loading("Creating battle...", { id: "battle" });
+      const { token } = await startBattle();
+      const url = `${window.location.origin}/battle/${token}`;
+      try {
+        if (navigator.share) await navigator.share({ title: "Battle me on era os", text: "Decode your era. Let's see who's winning today ⚔️", url });
+        else { await navigator.clipboard.writeText(url); }
+        toast.success("Battle link copied. Send it to your friend.", { id: "battle" });
+      } catch { toast.success("Battle link ready.", { id: "battle" }); }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't create battle", { id: "battle" });
+    }
+  };
+
   const tryRegenerate = async () => {
-    if (!isPremium) {
-      toast.error("Your era is set for today. Come back tomorrow. 🌙");
-      return;
-    }
-    if (regenUsed >= 1) {
-      toast.error("You've used your daily regeneration. 🌙");
-      return;
-    }
+    if (!isPremium) { toast.error("Your era is set for today. Come back tomorrow. 🌙"); return; }
+    if (regenUsed >= 1) { toast.error("You've used your daily regeneration. 🌙"); return; }
     await beginQuestions();
   };
 
-  if (authed === null) {
-    return <main className="h-[100dvh] w-full bg-black" />;
-  }
+  const rateYesterday = async (rating: number) => {
+    if (!yesterday) return;
+    try {
+      await sendFeedback({ data: { era_card_id: yesterday.id, rating } });
+      setFeedbackDone(true);
+    } catch (e) { toast.error("Couldn't save rating"); }
+  };
+
+  if (authed === null) return <main className="h-[100dvh] w-full bg-black" />;
 
   return (
     <main className="relative h-[100dvh] w-full overflow-hidden text-white font-sans">
       <Toaster theme="dark" position="top-center" richColors />
-      <link
-        rel="stylesheet"
-        href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;600;700;800;900&display=swap"
-      />
+      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;600;700;800;900&display=swap" />
 
       {!authed && <Login />}
       {authed && needsOnboarding && <Onboarding onDone={completeOnboarding} />}
 
       {authed && !needsOnboarding && !started && (
-        <IntroScreen onStart={beginQuestions} profile={profile} />
+        <IntroScreen
+          onStart={beginQuestions}
+          profile={profile}
+          stats={stats}
+          streak={streak}
+          yesterday={feedbackDone ? null : yesterday}
+          feedbackDone={feedbackDone}
+          onRate={rateYesterday}
+        />
       )}
 
       {authed && started && loadingQs && (
@@ -270,6 +291,7 @@ function Index() {
           profile={profile}
           onSave={onSave}
           onShare={onShare}
+          onBattle={onBattle}
           onReset={tryRegenerate}
           alreadyDecoded={alreadyDecoded}
           isPremium={isPremium}
@@ -280,41 +302,124 @@ function Index() {
   );
 }
 
-
 const MARQUEE_ITEMS = ["know your arc", "decode your era", "find your vibe", "trust the process"];
 
-function IntroScreen({ onStart, profile }: { onStart: () => void; profile: any }) {
+function streakLabel(s: { streak: number; broken: boolean } | null): string | null {
+  if (!s) return null;
+  if (s.broken && s.streak === 0) return "Your arc reset. The universe noticed. Come back tomorrow. 🌙";
+  const n = s.streak;
+  if (n <= 0) return null;
+  if (n === 1) return "Your arc begins 🌱";
+  if (n < 3) return `Day ${n}. The arc is forming.`;
+  if (n === 3) return "3 days. Something is shifting.";
+  if (n < 7) return `${n} days in. Holding.`;
+  if (n === 7) return "One week. Your arc is forming 🔥";
+  if (n < 14) return `${n} days. The mirror is watching.`;
+  if (n === 14) return "Two weeks. You're not the same ⚡";
+  if (n < 21) return `${n} days. Locked in.`;
+  if (n === 21) return "21 days. This is a habit now.";
+  if (n < 30) return `${n} days. Sacred territory.`;
+  if (n === 30) return "30 decodes. The mirror knows you 🪞";
+  return `${n} days decoded. Untouchable.`;
+}
+
+function formatCount(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(n % 1_000_000 === 0 ? 0 : 1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(n % 1_000 === 0 ? 0 : 1)}K`;
+  return String(n);
+}
+
+function CountUp({ value }: { value: number }) {
+  const [v, setV] = useState(0);
+  useEffect(() => {
+    const start = performance.now();
+    const dur = 900;
+    let raf = 0;
+    const tick = (t: number) => {
+      const p = Math.min(1, (t - start) / dur);
+      const eased = 1 - Math.pow(1 - p, 3);
+      setV(Math.round(eased * value));
+      if (p < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [value]);
+  return <span className="count-pop tabular-nums">{formatCount(v)}</span>;
+}
+
+function IntroScreen({
+  onStart, profile, stats, streak, yesterday, feedbackDone, onRate,
+}: {
+  onStart: () => void;
+  profile: any;
+  stats: { today: number; total: number } | null;
+  streak: { streak: number; broken: boolean } | null;
+  yesterday: { id: string; warning: string; era_name: string; brutal_truth: string } | null;
+  feedbackDone: boolean;
+  onRate: (n: number) => void;
+}) {
+  const sLabel = useMemo(() => streakLabel(streak), [streak]);
+
   return (
-    <div className="absolute inset-0 overflow-hidden text-white" style={{ background: "var(--grad-hero)" }}>
-      <div className="blob float-slow" style={{ width: 320, height: 320, background: "#FF006E", top: -60, left: -80 }} />
-      <div className="blob float-med" style={{ width: 280, height: 280, background: "#FFBE0B", bottom: -60, right: -60 }} />
-      <div className="blob float-slow" style={{ width: 220, height: 220, background: "#8338EC", top: "40%", right: -40 }} />
+    <div className="absolute inset-0 overflow-hidden text-white">
+      <AnimatedBg preset="hero" />
       <div className="grain absolute inset-0 pointer-events-none" />
 
-      <div className="relative h-full flex flex-col px-6 pt-6 pb-7">
-        <div className="flex items-center justify-between">
+      <div className="relative h-full flex flex-col px-6 pt-6 pb-5 overflow-y-auto">
+        <div className="flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2.5">
             <span className="inline-block w-4 h-4 rounded-full bg-[#FFBE0B] shadow-[0_0_18px_6px_rgba(255,190,11,0.55)] animate-pulse" />
             <span className="text-lg font-bold tracking-tight lowercase text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.4)]">era os</span>
           </div>
-          <button
-            onClick={() => supabase.auth.signOut()}
-            className="text-[10px] tracking-[0.25em] uppercase text-white/60 hover:text-white"
-          >sign out</button>
+          <button onClick={() => supabase.auth.signOut()}
+            className="text-[10px] tracking-[0.25em] uppercase text-white/60 hover:text-white">sign out</button>
         </div>
 
-        <div className="mt-10">
-          <h1 className="font-display text-[4.2rem] leading-[0.92] -tracking-[0.04em] text-shadow-pop">
+        <div className="mt-7 shrink-0">
+          <h1 className="font-display text-[3.6rem] sm:text-[4.2rem] leading-[0.92] -tracking-[0.04em] text-shadow-pop">
             <span className="block text-white">{profile?.name ? `HEY ${String(profile.name).split(" ")[0].toUpperCase()},` : "DECODE"}</span>
             <span className="block text-white">DECODE</span>
             <span className="block text-[#FFBE0B]">YOUR ERA.</span>
           </h1>
-          <p className="mt-5 text-base font-bold text-white max-w-[18rem] drop-shadow-[0_2px_4px_rgba(0,0,0,0.35)]">
+          <p className="mt-4 text-base font-bold text-white max-w-[18rem] drop-shadow-[0_2px_4px_rgba(0,0,0,0.35)]">
             Three weird questions. One brutally honest card.
           </p>
+
+          {stats && (
+            <div className="mt-3 text-white/90 text-[12px] font-bold tracking-wide leading-tight">
+              <div><CountUp value={stats.today} /> eras decoded today 🌍</div>
+              <div className="text-white/70 text-[11px] font-semibold mt-0.5">
+                <CountUp value={stats.total} /> total eras decoded worldwide
+              </div>
+            </div>
+          )}
+
+          {sLabel && (
+            <div className="mt-3 inline-block rounded-full bg-black/55 backdrop-blur px-3 py-1.5 border border-white/15 text-[11px] tracking-wide font-bold text-white">
+              {sLabel}
+            </div>
+          )}
         </div>
 
-        <div className="mt-6 marquee">
+        {yesterday && !feedbackDone && (
+          <div className="mt-4 rounded-2xl bg-black/45 backdrop-blur border border-white/15 px-4 py-3 shrink-0">
+            <div className="text-[9px] tracking-[0.35em] uppercase text-white/60 font-bold">yesterday's warning</div>
+            <div className="mt-1 text-[13px] text-white font-semibold leading-snug">{yesterday.warning || yesterday.brutal_truth}</div>
+            <div className="mt-2 text-[10px] tracking-[0.25em] uppercase text-white/70">how accurate was this?</div>
+            <div className="mt-1 flex gap-1.5">
+              {[1, 2, 3, 4, 5].map((n) => (
+                <button key={n} onClick={() => onRate(n)} className="press text-2xl leading-none">⭐</button>
+              ))}
+            </div>
+          </div>
+        )}
+        {feedbackDone && (
+          <div className="mt-3 text-[11px] text-white/80 italic shrink-0">
+            Your feedback makes the mirror sharper for everyone 🪞
+          </div>
+        )}
+
+        <div className="mt-5 marquee shrink-0">
           <div className="inline-block rounded-full bg-black/55 px-5 py-2 backdrop-blur-sm border border-white/10 shadow-[0_4px_20px_rgba(0,0,0,0.3)]">
             <div className="marquee-track text-xs font-black uppercase tracking-[0.25em] text-white">
               {[...MARQUEE_ITEMS, ...MARQUEE_ITEMS, ...MARQUEE_ITEMS].map((t, i) => (
@@ -326,7 +431,7 @@ function IntroScreen({ onStart, profile }: { onStart: () => void; profile: any }
 
         <button
           onClick={onStart}
-          className="press animate-bounce-in w-full rounded-2xl py-7 font-display text-[1.8rem] uppercase tracking-wide text-white shadow-[0_0_30px_rgba(255,0,110,0.35),0_0_60px_rgba(131,56,236,0.25),6px_6px_0_0_#000] mt-auto mb-6"
+          className="press animate-bounce-in w-full rounded-2xl py-6 font-display text-[1.7rem] uppercase tracking-wide text-white shadow-[0_0_30px_rgba(255,0,110,0.35),0_0_60px_rgba(131,56,236,0.25),6px_6px_0_0_#000] mt-5 mb-0"
           style={{ background: "linear-gradient(135deg, #FF006E 0%, #8338EC 100%)", border: "4px solid black", borderBottomWidth: "8px", borderBottomColor: "#FFBE0B" }}
         >
           Decode My Era
@@ -365,11 +470,15 @@ function QuestionScreen({
     : "";
 
   return (
-    <div
-      key={index}
-      className={"absolute inset-0 flex flex-col px-6 pt-10 pb-8 anim-question-in " + s.text + " " + transClass}
-      style={{ background: s.bg }}
-    >
+    <div key={index} className={"absolute inset-0 flex flex-col px-6 pt-10 pb-8 anim-question-in " + s.text + " " + transClass}
+      style={{ background: s.bg }}>
+      <BlobLayer
+        intensity={0.35}
+        blobs={[
+          { color: s.blobs[0], size: 280, top: "-10%", left: "-12%", dur: 18 },
+          { color: s.blobs[1], size: 240, bottom: "-12%", right: "-12%", dur: 24, delay: 3 },
+        ]}
+      />
       <ProgressDots index={index} />
       <div className="grain absolute inset-0 pointer-events-none" />
 
@@ -378,7 +487,7 @@ function QuestionScreen({
           0{index + 1} / 03
         </div>
 
-        <h2 className="font-display text-[2.4rem] leading-[1.02] -tracking-[0.03em] mb-auto">
+        <h2 className="font-display text-[2.2rem] sm:text-[2.4rem] leading-[1.02] -tracking-[0.03em] mb-auto" style={{ textWrap: "balance" as any }}>
           {question.question_text}
         </h2>
 
@@ -412,8 +521,9 @@ function QuestionScreen({
 
 function LoadingScreen({ typed, sublabel = "eraos · oracle" }: { typed: string; sublabel?: string }) {
   return (
-    <div className="absolute inset-0 bg-black flex items-center justify-center px-6 anim-fade-in-slow">
-      <div className="text-center">
+    <div className="absolute inset-0 flex items-center justify-center px-6 anim-fade-in-slow overflow-hidden">
+      <AnimatedBg preset="loading" intensity={0.45} />
+      <div className="relative text-center">
         <div className="font-display text-3xl text-white tracking-tight">
           {typed}
           <span className="inline-block w-[3px] h-7 bg-[#FFBE0B] ml-1 align-middle blink" />
@@ -444,12 +554,13 @@ function Countdown() {
 }
 
 function ResultScreen({
-  card, profile, onSave, onShare, onReset, alreadyDecoded, isPremium, regenUsed,
+  card, profile, onSave, onShare, onBattle, onReset, alreadyDecoded, isPremium, regenUsed,
 }: {
   card: EraCardType;
   profile: any;
   onSave: () => void;
   onShare: () => void;
+  onBattle: () => void;
   onReset: () => void;
   alreadyDecoded: boolean;
   isPremium: boolean;
@@ -458,8 +569,7 @@ function ResultScreen({
   const canRegen = isPremium && regenUsed < 1;
   return (
     <div className="absolute inset-0 overflow-hidden">
-      <EraCard card={card} profile={profile} onSave={onSave} onShare={onShare} />
-
+      <EraCard card={card} profile={profile} onSave={onSave} onShare={onShare} onBattle={onBattle} />
 
       {alreadyDecoded && (
         <div className="absolute top-3 left-3 z-20 rounded-full bg-black/55 backdrop-blur-md border border-white/30 text-white text-[10px] font-black tracking-[0.2em] uppercase px-3 py-1.5">
