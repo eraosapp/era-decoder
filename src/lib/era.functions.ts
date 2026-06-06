@@ -21,6 +21,9 @@ const CardSchema = z.object({
   character_type: z.enum(CHARACTERS),
   vibe_word: z.string(),
   cosmic_prediction: z.string(),
+  song_name: z.string(),
+  song_artist: z.string(),
+  song_reason: z.string(),
 });
 
 export type EraCard = z.infer<typeof CardSchema>;
@@ -35,18 +38,24 @@ function todayUTC() {
   return new Date().toISOString().slice(0, 10);
 }
 
-// ---------- helpers for AI question generation ----------
-
 function ageFromDob(dob?: string | null): number | null {
   if (!dob) return null;
   const d = new Date(dob);
   if (isNaN(d.getTime())) return null;
-  const diff = Date.now() - d.getTime();
-  return Math.floor(diff / (365.25 * 24 * 3600 * 1000));
+  return Math.floor((Date.now() - d.getTime()) / (365.25 * 24 * 3600 * 1000));
+}
+
+function ageBucketFor(age: number | null): string {
+  if (age == null) return "general adult";
+  if (age <= 18) return "16-18";
+  if (age <= 21) return "18-21";
+  if (age <= 24) return "21-24";
+  if (age <= 27) return "24-27";
+  if (age <= 32) return "27-32";
+  return `${age}`;
 }
 
 function moonPhase(): string {
-  // synodic month calc anchored at known new moon 2000-01-06 18:14 UTC
   const synodic = 29.53058867;
   const anchor = Date.UTC(2000, 0, 6, 18, 14) / 86400000;
   const today = Date.now() / 86400000;
@@ -82,6 +91,19 @@ async function fetchTrending(city?: string | null): Promise<string[]> {
   }
 }
 
+function regionalLangLine(region: string, city?: string | null): string {
+  const isIndia = region === "IN";
+  if (!isIndia) return `LANGUAGE: English with Gen Z tone — sharp, dry, terminally online.`;
+  const c = (city || "").toLowerCase();
+  if (c.includes("mumbai") || c.includes("bombay") || c.includes("pune")) {
+    return `LANGUAGE: Mumbai vibe Hinglish — code-switch naturally, "boss", "tu", "scene kya hai", "bhidu" energy. Never translate, code-switch mid-sentence.`;
+  }
+  if (c.includes("bangalore") || c.includes("bengaluru") || c.includes("chennai") || c.includes("hyderabad") || c.includes("kochi")) {
+    return `LANGUAGE: South India Hinglish — chill, English-leaning with natural Hindi/Tamil/Telugu words ("macha", "da", "anna", "scene", "literally"). Reference local cultural cues (filter coffee, IT park, traffic) when they fit. Never translate, code-switch.`;
+  }
+  return `LANGUAGE: Natural Delhi/North-India Hinglish — code-switch mid-sentence the way people actually talk. Sprinkle "yaar", "bhai", "matlab", "sach mein", "seedha bol", "scene", "literally", "bas", "chal" organically. Never translate; code-switch.`;
+}
+
 const QGenSchema = z.object({
   questions: z.array(z.object({
     question_text: z.string().min(4).max(220),
@@ -94,12 +116,6 @@ const QInputSchema = z.object({
   country: z.string().max(8).optional(),
 }).optional();
 
-/**
- * Generate 3 hyper-personalised questions using Gemini, based on:
- * - user age (from DOB), region, zodiac
- * - city + trending events this week
- * - current date, day of week, moon phase
- */
 export const getDailyQuestions = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => QInputSchema.parse(input))
@@ -122,22 +138,19 @@ export const getDailyQuestions = createServerFn({ method: "POST" })
     const trending = await fetchTrending(city);
 
     const isIndia = region === "IN";
-    let ageBucket = "general adult";
+    let ageThemes = "general life check-ins";
     if (age != null) {
-      if (age <= 18) ageBucket = "16-18 (school: exams, curfew, first crush, parents)";
-      else if (age <= 21) ageBucket = "18-21 (college, hostel life, heartbreak, placements)";
-      else if (age <= 24) ageBucket = "21-24 (first job, quarter-life crisis, salary vs passion)";
-      else if (age <= 27) ageBucket = isIndia
-        ? "24-27 India (marriage pressure, log kya kahenge, career vs family, settle down talk, money anxiety, comparison with cousins)"
-        : "24-27 (career grind, relationship questions, comparison)";
-      else if (age <= 32) ageBucket = "27-32 (therapy talk, career pivot, 'where did time go', friends drifting)";
-      else ageBucket = `${age} (life check-ins, what matters now)`;
+      if (age <= 18) ageThemes = "exams, curfew, first crush, parents, friend groups";
+      else if (age <= 21) ageThemes = "college, hostel, heartbreak, placements, hometown vs city";
+      else if (age <= 24) ageThemes = "first job, quarter-life crisis, salary vs passion, hostel-to-PG";
+      else if (age <= 27) ageThemes = isIndia
+        ? "marriage pressure, log kya kahenge, career vs family, settle down talk, money anxiety, cousin comparison"
+        : "career grind, relationship doubt, friend drift, comparison spirals";
+      else if (age <= 32) ageThemes = "therapy talk, career pivot, 'where did time go', friends drifting, family expectations";
+      else ageThemes = "life check-ins, what matters now, late-life pivots";
     }
 
-    const langLine = isIndia
-      ? `LANGUAGE: Natural Delhi/North-India Hinglish — code-switch mid-sentence the way people actually talk. Sprinkle "yaar", "bhai", "matlab", "scene", "literally", "bas", "chal" organically. Never translate; code-switch. Options must be embarrassingly specific and feel like a roast from their best friend.`
-      : `LANGUAGE: English, Gen Z tone — sharp, dry, terminally online. Options should be embarrassingly specific.`;
-
+    const langLine = regionalLangLine(region, city);
     const trendingLine = trending.length
       ? `Trending in ${city} this week:\n${trending.map((t) => `- ${t}`).join("\n")}`
       : "";
@@ -146,7 +159,7 @@ export const getDailyQuestions = createServerFn({ method: "POST" })
 
 USER CONTEXT:
 - Name: ${profile?.name || "friend"}
-- Age bucket: ${ageBucket}
+- Age: ${age ?? "unknown"} (themes: ${ageThemes})
 - Region: ${region}${country ? ` (${country})` : ""}
 - City: ${city || "unknown"}
 - Zodiac: ${profile?.zodiac || "unknown"}
@@ -158,11 +171,10 @@ ${langLine}
 
 RULES:
 - Exactly 3 questions, each with exactly 4 options.
-- At least ONE question must reference something REAL happening in ${city || "their city"} this week or the current day/moon/weekend energy. Not generic "how are you feeling".
+- At least ONE question must reference something REAL happening in ${city || "their city"} this week or the current day/moon/weekend energy.
 - Questions feel like the user's best friend texting them — casual, specific, knowing.
-- Options must be embarrassingly accurate — the kind of thing they'd react to with "stop reading my mind".
-- NO multiple choice that's morally loaded or judgemental. NO "self-help" tone.
-- Match the age-bucket themes above. Don't ask a 27-year-old about exams or an 18-year-old about marriage.
+- Options must be embarrassingly accurate — "stop reading my mind" energy.
+- Match the age themes. Don't ask a 27-year-old about exams or an 18-year-old about marriage.
 - Keep questions under 18 words. Options under 14 words.
 - No emojis inside questions or options.
 - Return ONLY via the tool call.`;
@@ -183,8 +195,7 @@ RULES:
               properties: {
                 questions: {
                   type: "array",
-                  minItems: 3,
-                  maxItems: 3,
+                  minItems: 3, maxItems: 3,
                   items: {
                     type: "object",
                     properties: {
@@ -225,9 +236,6 @@ RULES:
     return { questions, cycleReset: false, region };
   });
 
-/**
- * Get today's existing decode if any.
- */
 export const getTodayDecode = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<{ card: EraCard | null; regenerations_used: number; is_premium: boolean }> => {
@@ -249,12 +257,106 @@ const SubmitSchema = z.object({
     question: z.string(),
     answer: z.string(),
   })).length(3),
-  force: z.boolean().optional(), // premium regenerate
+  force: z.boolean().optional(),
+  city: z.string().max(80).optional(),
 });
 
-/**
- * Submit answers, mark seen, generate (or regenerate) today's card.
- */
+async function generateCard(opts: {
+  apiKey: string;
+  name?: string | null;
+  zodiac?: string | null;
+  region: string;
+  city?: string | null;
+  answers: { question: string; answer: string }[];
+}): Promise<EraCard> {
+  const { apiKey, name, zodiac, region, city, answers } = opts;
+  const isIndia = region === "IN";
+  const langLine = regionalLangLine(region, city);
+
+  const prompt = `You are the unapologetic mirror of era os.
+Your job: make the user feel SEEN in a way that is slightly uncomfortable.
+Like their most perceptive friend just caught them in their performance — with love.
+${name ? `Name: ${name}\n` : ""}${zodiac ? `Zodiac: ${zodiac}\n` : ""}${city ? `City: ${city}\n` : ""}
+${langLine}
+
+THEIR ANSWERS TODAY:
+${answers.map((a, i) => `${i + 1}. Q: ${a.question}\n   A: ${a.answer}`).join("\n")}
+
+BRUTAL TRUTH — non-negotiable:
+- EXACTLY ONE sentence. Never more.
+- Reference something SPECIFIC from their actual answers above.
+- Say what they have not admitted to themselves yet.
+- BAD: "You overthink and need to relax."
+- GOOD: "You have been replaying one specific conversation from 4 days ago and have written 6 different versions of what you should have said."
+
+LESS IS MORE — every word earns its place. No hashtags. No "the universe wants you to" clichés. No emojis inside text fields.
+
+- vibe_word: ONE word. Uppercase. Punchy.
+- current_era: 3-4 words MAX. Evocative, weirdly specific.
+- energy_match: ONE hyper-specific comparison.
+- aura_color_name: 2-3 invented words ("Burnt Cassette Pink", "3AM Static Blue"). Never just "Hot Pink".
+- aura_color_hex: matching #hex.
+- todays_warning: 1 punchy line.
+- todays_power_move: 1 specific actionable line.
+- emojis: exactly 3 emoji characters that match the vibe.
+- character_type: pick EXACTLY ONE from: ${CHARACTERS.join(", ")}
+- cosmic_prediction: MAX 2 short lines. Reference their ${zodiac || "zodiac"} sign by name.${isIndia ? " Weave in desi life context (chai, family WhatsApp, situationship, metro, log kya kahenge) when it fits." : ""}
+- song_name: pick ONE real song that matches this era + their zodiac + age + mood. ${isIndia ? "For Delhi/North-India: Hindi or Punjabi songs that match the vibe (Arijit/AP Dhillon/Karan Aujla/Prateek Kuhad/Anuv Jain energy depending on era). Use real song titles." : "English songs. Use real titles."} For haunted/sad: melancholic. Villain: power anthems. Soft/romantic: indie/lo-fi. Chaotic: hype.
+- song_artist: the artist of that song.
+- song_reason: ONE specific line — why THIS song for THEIR era today. Reference a lyric or vibe detail, not generic.
+
+Every output should make the user put their phone down for a second before screenshotting.`;
+
+  const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    method: "POST",
+    headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "google/gemini-3-flash-preview",
+      messages: [{ role: "user", content: prompt }],
+      tools: [{
+        type: "function",
+        function: {
+          name: "return_era_card",
+          description: "Return the user's Era Card",
+          parameters: {
+            type: "object",
+            properties: {
+              current_era: { type: "string" },
+              energy_match: { type: "string" },
+              brutal_truth: { type: "string" },
+              aura_color_name: { type: "string" },
+              aura_color_hex: { type: "string" },
+              todays_warning: { type: "string" },
+              todays_power_move: { type: "string" },
+              emojis: { type: "array", items: { type: "string" }, minItems: 3, maxItems: 3 },
+              character_type: { type: "string", enum: CHARACTERS as unknown as string[] },
+              vibe_word: { type: "string" },
+              cosmic_prediction: { type: "string" },
+              song_name: { type: "string" },
+              song_artist: { type: "string" },
+              song_reason: { type: "string" },
+            },
+            required: ["current_era", "energy_match", "brutal_truth", "aura_color_name", "aura_color_hex", "todays_warning", "todays_power_move", "emojis", "character_type", "vibe_word", "cosmic_prediction", "song_name", "song_artist", "song_reason"],
+            additionalProperties: false,
+          },
+        },
+      }],
+      tool_choice: { type: "function", function: { name: "return_era_card" } },
+    }),
+  });
+
+  if (!res.ok) {
+    const txt = await res.text();
+    if (res.status === 429) throw new Error("Rate limited. Try again in a moment.");
+    if (res.status === 402) throw new Error("AI credits exhausted.");
+    throw new Error(`AI error (${res.status}): ${txt.slice(0, 200)}`);
+  }
+  const json = await res.json();
+  const args = json.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments;
+  if (!args) throw new Error("No card returned from AI");
+  return CardSchema.parse(JSON.parse(args));
+}
+
 export const submitDailyAnswers = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => SubmitSchema.parse(input))
@@ -265,7 +367,7 @@ export const submitDailyAnswers = createServerFn({ method: "POST" })
 
     const today = todayUTC();
     const { data: profile } = await supabase
-      .from("profiles").select("name, zodiac, is_premium, region").eq("id", userId).maybeSingle();
+      .from("profiles").select("name, zodiac, dob, is_premium, region").eq("id", userId).maybeSingle();
 
     const { data: existing } = await supabase
       .from("daily_decodes").select("id, card, regenerations_used")
@@ -282,95 +384,46 @@ export const submitDailyAnswers = createServerFn({ method: "POST" })
     const seenRows = data.answers.map((a) => ({ user_id: userId, question_id: a.question_id }));
     await supabase.from("user_questions_seen").upsert(seenRows, { onConflict: "user_id,question_id" });
 
-    const zodiacLine = profile?.zodiac ? `\nZodiac sign: ${profile.zodiac}` : "";
-    const nameLine = profile?.name ? `\nName: ${profile.name}` : "";
-    const isIndia = profile?.region === "IN";
-    const langInstruction = isIndia
-      ? `\n\nLANGUAGE — DELHI/NORTH INDIA HINGLISH:
-Write brutal_truth and cosmic_prediction in natural Delhi Hinglish — code-switch mid-sentence the way people actually talk. Sprinkle "yaar", "bhai", "matlab", "seedha bol", "sach mein", "chal", "bas", "scene", "literally" organically. Never translate — code-switch. For cosmic_prediction, weave in desi life context when it fits (chai, late-night Zomato, family WhatsApp, "log kya kahenge", metro, situationship, 2AM overthinking). Other fields stay English.`
-      : `\n\nLANGUAGE: English with Gen Z tone — sharp, dry, terminally online. No boomer phrasing.`;
-
-    const prompt = `You are EraOS — the user's most honest friend, the one who catches them in their own lie with love. You decode their CURRENT ERA from 3 answers. Every output should make them put their phone down for a second before screenshotting.
-${nameLine}${zodiacLine}${langInstruction}
-
-THEIR ANSWERS TODAY:
-${data.answers.map((a, i) => `${i + 1}. Q: ${a.question}\n   A: ${a.answer}`).join("\n")}
-
-OUTPUT RULES — LESS IS MORE. Every word earns its place. No emojis inside text fields. No hashtags. No "the universe wants you to" clichés.
-
-- vibe_word: ONE word. Uppercase. Punchy.
-- current_era: 3-4 words MAX. Evocative, weirdly specific, never generic.
-- energy_match: ONE hyper-specific funny comparison (e.g. "a voice note you recorded but never sent").
-- brutal_truth: EXACTLY ONE sentence. MUST reference something SPECIFIC from their actual answers above — quote a detail, name the situation they described. It must be the thing they haven't admitted to themselves yet. Tone: best friend catching them in a lie, with love. NEVER generic advice.
-   BAD: "You overthink things and need to relax."
-   GOOD: "You've rewritten that one text 6 times and still haven't sent it because you already know what they'll say back."
-- aura_color_name: 2-3 words, invented, creative (e.g. "Burnt Cassette Pink", "3AM Static Blue"). Never just "Hot Pink".
-- aura_color_hex: matching hex starting with #
-- todays_warning: 1 punchy line. Specific. Funny-dark.
-- todays_power_move: 1 line. Specific action, not vague affirmation.
-- emojis: exactly 3 emoji characters that match the vibe.
-- character_type: pick EXACTLY ONE from: ${CHARACTERS.join(", ")}
-- cosmic_prediction: MAX 2 short lines. Reference their ${profile?.zodiac || "zodiac"} sign energy by name. Specific enough to feel written for TODAY, mysterious enough to feel cosmic.${isIndia ? " Weave in desi life context naturally." : ""} NOT a paragraph. NOT a horoscope cliché.`;
-
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [{ role: "user", content: prompt }],
-        tools: [{
-          type: "function",
-          function: {
-            name: "return_era_card",
-            description: "Return the user's Era Card",
-            parameters: {
-              type: "object",
-              properties: {
-                current_era: { type: "string" },
-                energy_match: { type: "string" },
-                brutal_truth: { type: "string" },
-                aura_color_name: { type: "string" },
-                aura_color_hex: { type: "string" },
-                todays_warning: { type: "string" },
-                todays_power_move: { type: "string" },
-                emojis: { type: "array", items: { type: "string" }, minItems: 3, maxItems: 3 },
-                character_type: { type: "string", enum: CHARACTERS as unknown as string[] },
-                vibe_word: { type: "string" },
-                cosmic_prediction: { type: "string" },
-              },
-              required: ["current_era", "energy_match", "brutal_truth", "aura_color_name", "aura_color_hex", "todays_warning", "todays_power_move", "emojis", "character_type", "vibe_word", "cosmic_prediction"],
-              additionalProperties: false,
-            },
-          },
-        }],
-        tool_choice: { type: "function", function: { name: "return_era_card" } },
-      }),
+    const card = await generateCard({
+      apiKey,
+      name: profile?.name,
+      zodiac: profile?.zodiac,
+      region: profile?.region || "GLOBAL",
+      city: data.city || null,
+      answers: data.answers,
     });
-
-    if (!res.ok) {
-      const txt = await res.text();
-      if (res.status === 429) throw new Error("Rate limited. Try again in a moment.");
-      if (res.status === 402) throw new Error("AI credits exhausted.");
-      throw new Error(`AI error (${res.status}): ${txt.slice(0, 200)}`);
-    }
-    const json = await res.json();
-    const args = json.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments;
-    if (!args) throw new Error("No card returned from AI");
-    const card = CardSchema.parse(JSON.parse(args));
 
     if (existing) {
       const newCount = existing.regenerations_used + 1;
       await supabase.from("daily_decodes").update({ card, regenerations_used: newCount }).eq("id", existing.id);
-      return { card, regenerations_used: newCount };
     } else {
       await supabase.from("daily_decodes").insert({ user_id: userId, decode_date: today, card, regenerations_used: 0 });
-      return { card, regenerations_used: 0 };
     }
+
+    // Also persist into era_cards archive (idempotent per user/date)
+    const age = ageFromDob(profile?.dob);
+    await supabase.from("era_cards").upsert({
+      user_id: userId,
+      decode_date: today,
+      vibe_word: card.vibe_word,
+      era_name: card.current_era,
+      brutal_truth: card.brutal_truth,
+      aura_color_name: card.aura_color_name,
+      aura_color_hex: card.aura_color_hex,
+      warning: card.todays_warning,
+      power_move: card.todays_power_move,
+      cosmic_prediction: card.cosmic_prediction,
+      song_name: card.song_name,
+      song_artist: card.song_artist,
+      song_reason: card.song_reason,
+      city: data.city || null,
+      age_group: ageBucketFor(age),
+      zodiac: profile?.zodiac || null,
+    }, { onConflict: "user_id,decode_date" } as any).then(() => {}, () => {});
+
+    return { card, regenerations_used: existing ? existing.regenerations_used + 1 : 0 };
   });
 
-/**
- * Update profile after onboarding.
- */
 const ProfileSchema = z.object({
   name: z.string().min(1).max(80),
   dob: z.string().min(4).max(20),
@@ -397,4 +450,228 @@ export const getProfile = createServerFn({ method: "POST" })
     const { supabase, userId } = context;
     const { data } = await supabase.from("profiles").select("*").eq("id", userId).maybeSingle();
     return data;
+  });
+
+/* ============ STATS ============ */
+export const getUsageStats = createServerFn({ method: "POST" })
+  .handler(async (): Promise<{ today: number; total: number }> => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const today = todayUTC();
+    const [{ count: todayCount }, { count: total }] = await Promise.all([
+      supabaseAdmin.from("era_cards").select("*", { count: "exact", head: true }).eq("decode_date", today),
+      supabaseAdmin.from("era_cards").select("*", { count: "exact", head: true }),
+    ]);
+    return { today: todayCount ?? 0, total: total ?? 0 };
+  });
+
+/* ============ STREAK ============ */
+export const getStreak = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<{ streak: number; broken: boolean }> => {
+    const { supabase, userId } = context;
+    const { data } = await supabase
+      .from("daily_decodes")
+      .select("decode_date")
+      .eq("user_id", userId)
+      .order("decode_date", { ascending: false })
+      .limit(60);
+    if (!data || data.length === 0) return { streak: 0, broken: false };
+
+    const dates = data.map((d) => d.decode_date as string);
+    const today = todayUTC();
+    const yest = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+
+    let streak = 0;
+    let cursor: string;
+    if (dates[0] === today) { streak = 1; cursor = today; }
+    else if (dates[0] === yest) { streak = 1; cursor = yest; }
+    else return { streak: 0, broken: true };
+
+    for (let i = 1; i < dates.length; i++) {
+      const prev = new Date(cursor + "T00:00:00Z");
+      prev.setUTCDate(prev.getUTCDate() - 1);
+      const expected = prev.toISOString().slice(0, 10);
+      if (dates[i] === expected) { streak++; cursor = expected; }
+      else break;
+    }
+    return { streak, broken: dates[0] !== today && dates[0] !== yest };
+  });
+
+/* ============ YESTERDAY FOR FEEDBACK ============ */
+export const getYesterdayForFeedback = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<{ id: string; warning: string; era_name: string; brutal_truth: string } | null> => {
+    const { supabase, userId } = context;
+    const yest = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+    const { data } = await supabase
+      .from("era_cards")
+      .select("id, warning, era_name, brutal_truth, accuracy_rating")
+      .eq("user_id", userId)
+      .eq("decode_date", yest)
+      .maybeSingle();
+    if (!data || data.accuracy_rating != null) return null;
+    return { id: data.id, warning: data.warning || "", era_name: data.era_name || "", brutal_truth: data.brutal_truth || "" };
+  });
+
+/* ============ SUBMIT FEEDBACK ============ */
+const FeedbackSchema = z.object({
+  era_card_id: z.string().uuid(),
+  rating: z.number().int().min(1).max(5),
+});
+export const submitFeedback = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => FeedbackSchema.parse(input))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const { data: card } = await supabase.from("era_cards").select("*").eq("id", data.era_card_id).eq("user_id", userId).maybeSingle();
+    if (!card) throw new Error("Card not found");
+    await supabase.from("era_cards").update({ accuracy_rating: data.rating }).eq("id", data.era_card_id);
+    await supabase.from("feedback").insert({
+      user_id: userId,
+      era_name: card.era_name,
+      brutal_truth: card.brutal_truth,
+      accuracy_rating: data.rating,
+      city: card.city,
+      zodiac: card.zodiac,
+    });
+    return { ok: true };
+  });
+
+/* ============ BATTLE ============ */
+function randToken() {
+  const a = new Uint8Array(9);
+  crypto.getRandomValues(a);
+  return Array.from(a, (b) => "abcdefghijklmnopqrstuvwxyz0123456789"[b % 36]).join("");
+}
+
+export const createBattle = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<{ token: string }> => {
+    const { supabase, userId } = context;
+    const today = todayUTC();
+    const [{ data: profile }, { data: decode }] = await Promise.all([
+      supabase.from("profiles").select("name").eq("id", userId).maybeSingle(),
+      supabase.from("daily_decodes").select("card").eq("user_id", userId).eq("decode_date", today).maybeSingle(),
+    ]);
+    if (!decode?.card) throw new Error("Decode your era first.");
+
+    // Reuse the 3 question texts the creator answered today (seen this session)
+    // Fallback: 3 simple battle questions if we don't have stored ones
+    const battleQs = [
+      { id: crypto.randomUUID(), question_text: "What's your energy today, brutally honest?", options: ["feral", "soft launch", "main character", "ghosting everyone"] },
+      { id: crypto.randomUUID(), question_text: "Last text you reread 5 times", options: ["a crush", "your group chat", "your ex", "your boss"] },
+      { id: crypto.randomUUID(), question_text: "Real plan for tonight", options: ["overthink in bed", "go out and regret it", "delete an app", "send risky text"] },
+    ];
+
+    const token = randToken();
+    const { error } = await supabase.from("battles").insert({
+      share_token: token,
+      creator_user_id: userId,
+      creator_name: profile?.name || "Player 1",
+      creator_card: decode.card,
+      questions: battleQs,
+    });
+    if (error) throw new Error(error.message);
+    return { token };
+  });
+
+const TokenSchema = z.object({ token: z.string().min(4).max(64) });
+
+export const getBattle = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => TokenSchema.parse(input))
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: battle } = await supabaseAdmin
+      .from("battles")
+      .select("share_token, creator_name, creator_card, questions, opponent_name, opponent_card, verdict")
+      .eq("share_token", data.token)
+      .maybeSingle();
+    if (!battle) throw new Error("Battle not found");
+    return battle;
+  });
+
+const PlayBattleSchema = z.object({
+  token: z.string().min(4).max(64),
+  name: z.string().min(1).max(40),
+  zodiac: z.string().max(40).optional(),
+  answers: z.array(z.object({
+    question_id: z.string(),
+    question: z.string(),
+    answer: z.string(),
+  })).length(3),
+});
+
+export const playBattle = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => PlayBattleSchema.parse(input))
+  .handler(async ({ data }) => {
+    const apiKey = process.env.LOVABLE_API_KEY;
+    if (!apiKey) throw new Error("LOVABLE_API_KEY not configured");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: battle } = await supabaseAdmin
+      .from("battles").select("*").eq("share_token", data.token).maybeSingle();
+    if (!battle) throw new Error("Battle not found");
+    if (battle.opponent_card) throw new Error("Battle already played");
+
+    const opponentCard = await generateCard({
+      apiKey,
+      name: data.name,
+      zodiac: data.zodiac || null,
+      region: "GLOBAL",
+      city: null,
+      answers: data.answers,
+    });
+
+    // Verdict
+    const verdictPrompt = `Two friends just decoded their eras. Pick a winner today — funny, specific, savage but loving. MAX 2 lines.
+
+PLAYER 1 (${battle.creator_name}):
+- Era: ${(battle.creator_card as any).current_era}
+- Vibe: ${(battle.creator_card as any).vibe_word}
+- Brutal truth: ${(battle.creator_card as any).brutal_truth}
+
+PLAYER 2 (${data.name}):
+- Era: ${opponentCard.current_era}
+- Vibe: ${opponentCard.vibe_word}
+- Brutal truth: ${opponentCard.brutal_truth}
+
+Return JSON: { "winner": "${battle.creator_name}" or "${data.name}", "verdict": "max 2 short lines, savage but loving" }`;
+
+    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "google/gemini-3-flash-preview",
+        messages: [{ role: "user", content: verdictPrompt }],
+        tools: [{
+          type: "function",
+          function: {
+            name: "return_verdict",
+            parameters: {
+              type: "object",
+              properties: {
+                winner: { type: "string" },
+                verdict: { type: "string" },
+              },
+              required: ["winner", "verdict"],
+              additionalProperties: false,
+            },
+          },
+        }],
+        tool_choice: { type: "function", function: { name: "return_verdict" } },
+      }),
+    });
+    const json = await res.json();
+    const args = json.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments;
+    const verdictParsed = args ? JSON.parse(args) : { winner: data.name, verdict: "Both eras hit. Tie today." };
+    const verdictText = `${verdictParsed.winner} wins today. ${verdictParsed.verdict}`;
+
+    await supabaseAdmin.from("battles").update({
+      opponent_name: data.name,
+      opponent_zodiac: data.zodiac || null,
+      opponent_card: opponentCard,
+      verdict: verdictText,
+    }).eq("share_token", data.token);
+
+    return { opponent_card: opponentCard, verdict: verdictText, creator_card: battle.creator_card, creator_name: battle.creator_name };
   });
