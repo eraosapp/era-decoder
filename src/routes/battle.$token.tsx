@@ -51,7 +51,7 @@ function BattlePage() {
       submit({ data: { token, name: name.trim() || "Friend", zodiac: zodiac || undefined, answers: next } })
         .then((r) => {
           setResult({
-            creator_card: battle.creator_card,
+            creator_card: battle.creator_card as unknown as EraCardType,
             creator_name: battle.creator_name,
             opponent_card: r.opponent_card,
             verdict: r.verdict,
