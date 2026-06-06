@@ -14,6 +14,51 @@ export type Database = {
   }
   public: {
     Tables: {
+      battles: {
+        Row: {
+          created_at: string
+          creator_card: Json
+          creator_name: string | null
+          creator_user_id: string
+          id: string
+          opponent_card: Json | null
+          opponent_name: string | null
+          opponent_zodiac: string | null
+          questions: Json
+          share_token: string
+          updated_at: string
+          verdict: string | null
+        }
+        Insert: {
+          created_at?: string
+          creator_card: Json
+          creator_name?: string | null
+          creator_user_id: string
+          id?: string
+          opponent_card?: Json | null
+          opponent_name?: string | null
+          opponent_zodiac?: string | null
+          questions: Json
+          share_token: string
+          updated_at?: string
+          verdict?: string | null
+        }
+        Update: {
+          created_at?: string
+          creator_card?: Json
+          creator_name?: string | null
+          creator_user_id?: string
+          id?: string
+          opponent_card?: Json | null
+          opponent_name?: string | null
+          opponent_zodiac?: string | null
+          questions?: Json
+          share_token?: string
+          updated_at?: string
+          verdict?: string | null
+        }
+        Relationships: []
+      }
       daily_decodes: {
         Row: {
           card: Json
@@ -41,6 +86,111 @@ export type Database = {
           regenerations_used?: number
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      era_cards: {
+        Row: {
+          accuracy_rating: number | null
+          age_group: string | null
+          aura_color_hex: string | null
+          aura_color_name: string | null
+          brutal_truth: string | null
+          city: string | null
+          cosmic_prediction: string | null
+          created_at: string
+          decode_date: string
+          era_name: string | null
+          id: string
+          power_move: string | null
+          song_artist: string | null
+          song_name: string | null
+          song_reason: string | null
+          updated_at: string
+          user_id: string
+          vibe_word: string | null
+          warning: string | null
+          zodiac: string | null
+        }
+        Insert: {
+          accuracy_rating?: number | null
+          age_group?: string | null
+          aura_color_hex?: string | null
+          aura_color_name?: string | null
+          brutal_truth?: string | null
+          city?: string | null
+          cosmic_prediction?: string | null
+          created_at?: string
+          decode_date?: string
+          era_name?: string | null
+          id?: string
+          power_move?: string | null
+          song_artist?: string | null
+          song_name?: string | null
+          song_reason?: string | null
+          updated_at?: string
+          user_id: string
+          vibe_word?: string | null
+          warning?: string | null
+          zodiac?: string | null
+        }
+        Update: {
+          accuracy_rating?: number | null
+          age_group?: string | null
+          aura_color_hex?: string | null
+          aura_color_name?: string | null
+          brutal_truth?: string | null
+          city?: string | null
+          cosmic_prediction?: string | null
+          created_at?: string
+          decode_date?: string
+          era_name?: string | null
+          id?: string
+          power_move?: string | null
+          song_artist?: string | null
+          song_name?: string | null
+          song_reason?: string | null
+          updated_at?: string
+          user_id?: string
+          vibe_word?: string | null
+          warning?: string | null
+          zodiac?: string | null
+        }
+        Relationships: []
+      }
+      feedback: {
+        Row: {
+          accuracy_rating: number
+          brutal_truth: string | null
+          city: string | null
+          created_at: string
+          era_name: string | null
+          feedback_date: string
+          id: string
+          user_id: string
+          zodiac: string | null
+        }
+        Insert: {
+          accuracy_rating: number
+          brutal_truth?: string | null
+          city?: string | null
+          created_at?: string
+          era_name?: string | null
+          feedback_date?: string
+          id?: string
+          user_id: string
+          zodiac?: string | null
+        }
+        Update: {
+          accuracy_rating?: number
+          brutal_truth?: string | null
+          city?: string | null
+          created_at?: string
+          era_name?: string | null
+          feedback_date?: string
+          id?: string
+          user_id?: string
+          zodiac?: string | null
         }
         Relationships: []
       }
