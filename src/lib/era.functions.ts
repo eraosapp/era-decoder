@@ -31,8 +31,10 @@ export type EraCard = z.infer<typeof CardSchema>;
 export type QuestionDTO = {
   id: string;
   question_text: string;
+  subtitle: string;
   options: string[];
 };
+
 
 function todayUTC() {
   return new Date().toISOString().slice(0, 10);
