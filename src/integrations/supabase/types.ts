@@ -200,6 +200,7 @@ export type Database = {
           dob: string | null
           id: string
           is_premium: boolean
+          living_situation: string | null
           name: string | null
           region: string
           symbol: string | null
@@ -211,6 +212,7 @@ export type Database = {
           dob?: string | null
           id: string
           is_premium?: boolean
+          living_situation?: string | null
           name?: string | null
           region?: string
           symbol?: string | null
@@ -222,6 +224,7 @@ export type Database = {
           dob?: string | null
           id?: string
           is_premium?: boolean
+          living_situation?: string | null
           name?: string | null
           region?: string
           symbol?: string | null
