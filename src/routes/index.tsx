@@ -500,9 +500,15 @@ function QuestionScreen({
           0{index + 1} / 03
         </div>
 
-        <h2 className="font-display text-[2.2rem] sm:text-[2.4rem] leading-[1.02] -tracking-[0.03em] mb-auto" style={{ textWrap: "balance" as any }}>
+        <h2 className="font-display text-[2.2rem] sm:text-[2.4rem] leading-[1.02] -tracking-[0.03em]" style={{ textWrap: "balance" as any }}>
           {question.question_text}
         </h2>
+        {question.subtitle && (
+          <p className="mt-3 text-[14px] sm:text-[15px] font-semibold opacity-75 leading-snug mb-auto" style={{ textWrap: "balance" as any }}>
+            {question.subtitle}
+          </p>
+        )}
+
 
         <div className="grid gap-3 mt-6">
           {question.options.map((opt) => {
