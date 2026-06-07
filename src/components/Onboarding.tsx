@@ -27,21 +27,36 @@ function getZodiac(dob: string) {
     if (fm === tm) {
       if (m === fm && day >= fd && day <= td) return z;
     } else {
-      // capricorn wraps year
       if ((m === fm && day >= fd) || (m === tm && day <= td)) return z;
     }
   }
   return null;
 }
 
-export type OnboardingData = { name: string; dob: string; zodiac: string; symbol: string };
+export type LivingSituation = "home" | "hostel" | "alone" | "other";
+export type OnboardingData = {
+  name: string;
+  dob: string;
+  zodiac: string;
+  symbol: string;
+  living_situation: LivingSituation;
+};
+
+const LIVING_OPTIONS: { id: LivingSituation; icon: string; label: string }[] = [
+  { id: "home",   icon: "🏠", label: "Ghar pe (with family)" },
+  { id: "hostel", icon: "🏢", label: "Hostel / College campus" },
+  { id: "alone",  icon: "🏙️", label: "Alone / PG in a new city" },
+  { id: "other",  icon: "✈️", label: "Somewhere else entirely" },
+];
 
 export function Onboarding({ onDone }: { onDone: (data: OnboardingData) => void }) {
   const [slide, setSlide] = useState(0);
   const [name, setName] = useState("");
   const [dob, setDob] = useState("");
+  const [living, setLiving] = useState<LivingSituation | null>(null);
   const zodiac = useMemo(() => getZodiac(dob), [dob]);
 
+  const TOTAL = 5;
   const next = () => setSlide((s) => s + 1);
   const finish = () => {
     onDone({
@@ -49,6 +64,7 @@ export function Onboarding({ onDone }: { onDone: (data: OnboardingData) => void 
       dob,
       zodiac: zodiac?.sign ?? "",
       symbol: zodiac?.symbol ?? "✦",
+      living_situation: living ?? "other",
     });
   };
 
@@ -61,14 +77,14 @@ export function Onboarding({ onDone }: { onDone: (data: OnboardingData) => void 
 
       {/* progress */}
       <div className="absolute top-0 left-0 right-0 flex gap-1.5 px-4 pt-4 z-30">
-        {[0, 1, 2, 3].map((i) => (
+        {Array.from({ length: TOTAL }, (_, i) => (
           <div key={i} className="flex-1 h-1 rounded-full bg-white/20 overflow-hidden">
             <div className="h-full bg-white transition-all duration-500" style={{ width: i <= slide ? "100%" : "0%" }} />
           </div>
         ))}
       </div>
 
-      <div key={slide} className="relative h-full flex flex-col justify-between px-6 pt-16 pb-8 anim-question-in">
+      <div key={slide} className="relative h-full flex flex-col justify-between px-6 pt-16 pb-8 anim-question-in overflow-y-auto">
         {slide === 0 && (
           <>
             <div className="flex-1 flex flex-col justify-center">
@@ -129,6 +145,36 @@ export function Onboarding({ onDone }: { onDone: (data: OnboardingData) => void 
         )}
 
         {slide === 3 && (
+          <>
+            <div className="flex-1 flex flex-col justify-center">
+              <h2 className="font-display text-[2.4rem] leading-[1.02] -tracking-[0.03em] mb-2">
+                Where are you at right now?
+              </h2>
+              <p className="text-sm text-white/80 mb-6 font-semibold">(the place that's shaping your day)</p>
+              <div className="grid gap-3">
+                {LIVING_OPTIONS.map((o) => {
+                  const sel = living === o.id;
+                  return (
+                    <button
+                      key={o.id}
+                      onClick={() => setLiving(o.id)}
+                      className={
+                        "press text-left rounded-2xl px-5 py-4 font-bold leading-snug border-4 border-black transition-all duration-200 flex items-center gap-3 " +
+                        (sel ? "bg-black text-white scale-[1.02] shadow-[0_0_0_4px_#FFBE0B]" : "bg-white text-black hover:bg-white/95")
+                      }
+                    >
+                      <span className="text-2xl">{o.icon}</span>
+                      <span>{o.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <PinkButton onClick={next} disabled={!living}>Next</PinkButton>
+          </>
+        )}
+
+        {slide === 4 && (
           <>
             <div className="flex-1 flex flex-col justify-center items-center text-center">
               <h2 className="font-display text-[2.4rem] leading-[1.02] -tracking-[0.03em]">
