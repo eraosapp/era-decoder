@@ -51,6 +51,15 @@ function Index() {
   const [authed, setAuthed] = useState<boolean | null>(null);
   const [profile, setProfile] = useState<any>(null);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
+  const [showTrailer, setShowTrailer] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return !localStorage.getItem("eraos.seenTrailer");
+  });
+  const dismissTrailer = () => {
+    try { localStorage.setItem("eraos.seenTrailer", "1"); } catch {}
+    setShowTrailer(false);
+  };
+
 
   const [started, setStarted] = useState(false);
   const [step, setStep] = useState(0);
