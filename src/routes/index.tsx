@@ -11,8 +11,10 @@ import { detectLocation, getCachedLocation } from "@/lib/location";
 import { EraCard } from "@/components/EraCard";
 import { Onboarding, type OnboardingData } from "@/components/Onboarding";
 import { Login } from "@/components/Login";
+import { Trailer } from "@/components/Trailer";
 import { AnimatedBg, BlobLayer } from "@/components/AnimatedBg";
 import { supabase } from "@/integrations/supabase/client";
+
 
 export const Route = createFileRoute("/")({
   head: () => ({
