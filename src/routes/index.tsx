@@ -265,8 +265,10 @@ function Index() {
       <Toaster theme="dark" position="top-center" richColors />
       <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;600;700;800;900&display=swap" />
 
-      {!authed && <Login />}
-      {authed && needsOnboarding && <Onboarding onDone={completeOnboarding} />}
+      {showTrailer && <Trailer onContinue={dismissTrailer} />}
+      {!showTrailer && !authed && <Login />}
+      {!showTrailer && authed && needsOnboarding && <Onboarding onDone={completeOnboarding} />}
+
 
       {authed && !needsOnboarding && !started && (
         <IntroScreen
