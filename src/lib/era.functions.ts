@@ -129,11 +129,12 @@ export const getDailyQuestions = createServerFn({ method: "POST" })
     if (!apiKey) throw new Error("LOVABLE_API_KEY not configured");
 
     const { data: profile } = await supabase
-      .from("profiles").select("region, dob, zodiac, name").eq("id", userId).maybeSingle();
+      .from("profiles").select("region, dob, zodiac, name, living_situation").eq("id", userId).maybeSingle();
     const region = (profile?.region as "GLOBAL" | "IN") || "GLOBAL";
     const age = ageFromDob(profile?.dob);
     const city = data?.city?.trim() || null;
     const country = data?.country?.trim() || (region === "IN" ? "IN" : null);
+    const living = (profile?.living_situation as string | null) || null;
 
     const now = new Date();
     const dayOfWeek = now.toLocaleDateString("en-US", { weekday: "long" });
@@ -154,6 +155,12 @@ export const getDailyQuestions = createServerFn({ method: "POST" })
       else ageThemes = "life check-ins, what matters now, late-life pivots";
     }
 
+    let livingLine = "";
+    if (living === "home") livingLine = "LIVING SITUATION: At home with family. Questions can touch on family dynamics, parents in the next room, ghar wali politics, log kya kahenge. NEVER ask about hostel life, roommates, mess food, or 'alone in a new city' loneliness.";
+    else if (living === "hostel") livingLine = "LIVING SITUATION: Hostel / college campus. Roommates, mess, warden, late-night chai, campus crushes are fair game. NEVER ask about family at home, ghar pe pressure, or 'alone in a new city' isolation.";
+    else if (living === "alone") livingLine = "LIVING SITUATION: Alone / PG in a new city. Independence, loneliness, missing home, cooking for one, swiggy at 2am, city isolation are fair game. NEVER assume family or roommates are present.";
+    else if (living === "other") livingLine = "LIVING SITUATION: Unconventional setup. Keep questions universal — don't assume family, hostel, or solo city life.";
+
     const langLine = regionalLangLine(region, city);
     const trendingLine = trending.length
       ? `Trending in ${city} this week:\n${trending.map((t) => `- ${t}`).join("\n")}`
@@ -171,16 +178,23 @@ USER CONTEXT:
 - Moon phase: ${moon}
 ${trendingLine}
 
+${livingLine}
+
 ${langLine}
 
 RULES:
-- Exactly 3 questions, each with exactly 4 options.
+- Exactly 3 questions, each with exactly 4 options AND a subtitle.
+- SUBTITLE: one short clarifying line in plain words, written like a knowing friend whispering the real meaning. Lowercase, casual, often in parentheses-style. Max 14 words. Mix Hinglish if Indian.
+  - GOOD: "(basically — what's living rent free in your head rn)"
+  - GOOD: "(the thing you keep doing even though you know you shouldn't)"
+  - GOOD: "(yaar sach mein — koi bhi judgement nahi)"
+  - BAD: "Pick the option that best describes you" (too formal, too generic)
 - At least ONE question must reference something REAL happening in ${city || "their city"} this week or the current day/moon/weekend energy.
 - Questions feel like the user's best friend texting them — casual, specific, knowing.
 - Options must be embarrassingly accurate — "stop reading my mind" energy.
-- Match the age themes. Don't ask a 27-year-old about exams or an 18-year-old about marriage.
-- Keep questions under 18 words. Options under 14 words.
-- No emojis inside questions or options.
+- Match the age themes AND living situation above. Never ask about situations the user isn't in.
+- Keep questions under 18 words. Options under 14 words. Subtitle under 14 words.
+- No emojis inside questions, subtitles, or options.
 - Return ONLY via the tool call.`;
 
     const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -204,9 +218,10 @@ RULES:
                     type: "object",
                     properties: {
                       question_text: { type: "string" },
+                      subtitle: { type: "string" },
                       options: { type: "array", items: { type: "string" }, minItems: 4, maxItems: 4 },
                     },
-                    required: ["question_text", "options"],
+                    required: ["question_text", "subtitle", "options"],
                     additionalProperties: false,
                   },
                 },
@@ -234,8 +249,10 @@ RULES:
     const questions: QuestionDTO[] = parsed.questions.map((q) => ({
       id: crypto.randomUUID(),
       question_text: q.question_text,
+      subtitle: q.subtitle,
       options: q.options,
     }));
+
 
     return { questions, cycleReset: false, region };
   });
