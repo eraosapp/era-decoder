@@ -109,9 +109,11 @@ function regionalLangLine(region: string, city?: string | null): string {
 const QGenSchema = z.object({
   questions: z.array(z.object({
     question_text: z.string().min(4).max(220),
+    subtitle: z.string().min(2).max(180),
     options: z.array(z.string().min(1).max(140)).length(4),
   })).length(3),
 });
+
 
 const QInputSchema = z.object({
   city: z.string().max(80).optional(),
