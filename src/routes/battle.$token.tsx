@@ -29,13 +29,14 @@ function BattlePage() {
         setBattle(b);
         if (b.opponent_card) {
           setResult({
-            creator_card: b.creator_card,
-            creator_name: b.creator_name,
-            opponent_card: b.opponent_card,
+            creator_card: b.creator_card as unknown as EraCardType,
+            creator_name: (b.creator_name as string) ?? "Player 1",
+            opponent_card: b.opponent_card as unknown as EraCardType,
             verdict: b.verdict || "",
           });
           setStep("done");
         }
+
       })
       .catch(() => toast.error("Battle not found"));
   }, [token]);
