@@ -11,8 +11,10 @@ import { detectLocation, getCachedLocation } from "@/lib/location";
 import { EraCard } from "@/components/EraCard";
 import { Onboarding, type OnboardingData } from "@/components/Onboarding";
 import { Login } from "@/components/Login";
+import { Trailer } from "@/components/Trailer";
 import { AnimatedBg, BlobLayer } from "@/components/AnimatedBg";
 import { supabase } from "@/integrations/supabase/client";
+
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -49,6 +51,15 @@ function Index() {
   const [authed, setAuthed] = useState<boolean | null>(null);
   const [profile, setProfile] = useState<any>(null);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
+  const [showTrailer, setShowTrailer] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return !localStorage.getItem("eraos.seenTrailer");
+  });
+  const dismissTrailer = () => {
+    try { localStorage.setItem("eraos.seenTrailer", "1"); } catch {}
+    setShowTrailer(false);
+  };
+
 
   const [started, setStarted] = useState(false);
   const [step, setStep] = useState(0);
@@ -254,8 +265,10 @@ function Index() {
       <Toaster theme="dark" position="top-center" richColors />
       <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;600;700;800;900&display=swap" />
 
-      {!authed && <Login />}
-      {authed && needsOnboarding && <Onboarding onDone={completeOnboarding} />}
+      {showTrailer && <Trailer onContinue={dismissTrailer} />}
+      {!showTrailer && !authed && <Login />}
+      {!showTrailer && authed && needsOnboarding && <Onboarding onDone={completeOnboarding} />}
+
 
       {authed && !needsOnboarding && !started && (
         <IntroScreen
@@ -487,9 +500,15 @@ function QuestionScreen({
           0{index + 1} / 03
         </div>
 
-        <h2 className="font-display text-[2.2rem] sm:text-[2.4rem] leading-[1.02] -tracking-[0.03em] mb-auto" style={{ textWrap: "balance" as any }}>
+        <h2 className="font-display text-[2.2rem] sm:text-[2.4rem] leading-[1.02] -tracking-[0.03em]" style={{ textWrap: "balance" as any }}>
           {question.question_text}
         </h2>
+        {question.subtitle && (
+          <p className="mt-3 text-[14px] sm:text-[15px] font-semibold opacity-75 leading-snug mb-auto" style={{ textWrap: "balance" as any }}>
+            {question.subtitle}
+          </p>
+        )}
+
 
         <div className="grid gap-3 mt-6">
           {question.options.map((opt) => {
