@@ -452,6 +452,7 @@ const ProfileSchema = z.object({
   symbol: z.string().max(8),
   region: z.enum(["GLOBAL", "IN"]),
   living_situation: z.enum(["home", "hostel", "alone", "other"]).optional(),
+  city: z.string().max(80).optional(),
 });
 
 export const upsertProfile = createServerFn({ method: "POST" })
@@ -462,6 +463,7 @@ export const upsertProfile = createServerFn({ method: "POST" })
     const { error } = await supabase.from("profiles").upsert({
       id: userId, name: data.name, dob: data.dob, zodiac: data.zodiac, symbol: data.symbol, region: data.region,
       ...(data.living_situation ? { living_situation: data.living_situation } : {}),
+      ...(data.city ? { city: data.city } : {}),
     } as any);
     if (error) throw new Error(error.message);
     return { ok: true };
