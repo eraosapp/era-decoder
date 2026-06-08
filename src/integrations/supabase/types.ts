@@ -196,6 +196,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          city: string | null
           created_at: string
           dob: string | null
           id: string
@@ -208,6 +209,7 @@ export type Database = {
           zodiac: string | null
         }
         Insert: {
+          city?: string | null
           created_at?: string
           dob?: string | null
           id: string
@@ -220,6 +222,7 @@ export type Database = {
           zodiac?: string | null
         }
         Update: {
+          city?: string | null
           created_at?: string
           dob?: string | null
           id?: string

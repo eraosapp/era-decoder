@@ -117,8 +117,21 @@ function Index() {
 
   const completeOnboarding = async (data: OnboardingData) => {
     try {
-      const loc = await detectLocation().catch(() => ({ region: "GLOBAL" as const }));
-      await saveProfile({ data: { ...data, region: loc.region } });
+      let region: "GLOBAL" | "IN" = "GLOBAL";
+      let city = data.city;
+
+      if (!city) {
+        const loc = await detectLocation().catch(() => ({ region: "GLOBAL" as const, city: undefined, country: undefined }));
+        region = loc.region as "GLOBAL" | "IN";
+        city = loc.city || null;
+      } else {
+        const lower = city.toLowerCase();
+        const indianCities = ["delhi","new delhi","mumbai","bangalore","bengaluru","chennai","hyderabad","kolkata","pune","ahmedabad","jaipur","lucknow","kanpur","nagpur","indore","thane","bhopal","visakhapatnam","vadodara","firozabad","ludhiana","rajkot","agra","siliguri","durgapur","chandigarh","coimbatore","kochi","ernakulam","mysore","mangalore","goa","noida","gurgaon","gurugram","faridabad","ghaziabad","dehradun","patna","ranchi","bhubaneswar","cuttack","guwahati","shillong","trivandrum","thiruvananthapuram","madurai","salem","tiruchirappalli","warangal","nellore","tirupati","vijayawada","guntur","kakinada","rajahmundry","srikakulam","vizag","visakhapatnam"];
+        if (indianCities.some((c) => lower.includes(c))) region = "IN";
+        try { localStorage.setItem("eraos.location", JSON.stringify({ region, city, country: region === "IN" ? "IN" : undefined })); } catch {}
+      }
+
+      await saveProfile({ data: { ...data, region, city: city || null } });
       const p = await loadProfile();
       setProfile(p);
       setNeedsOnboarding(false);

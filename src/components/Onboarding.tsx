@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { detectLocation } from "@/lib/location";
 
 const ZODIAC = [
   { sign: "Capricorn", symbol: "♑", from: [12, 22], to: [1, 19] },
@@ -40,6 +41,7 @@ export type OnboardingData = {
   zodiac: string;
   symbol: string;
   living_situation: LivingSituation;
+  city?: string | null;
 };
 
 const LIVING_OPTIONS: { id: LivingSituation; icon: string; label: string }[] = [
@@ -54,9 +56,13 @@ export function Onboarding({ onDone }: { onDone: (data: OnboardingData) => void 
   const [name, setName] = useState("");
   const [dob, setDob] = useState("");
   const [living, setLiving] = useState<LivingSituation | null>(null);
+  const [city, setCity] = useState<string | null>(null);
+  const [locationMode, setLocationMode] = useState<"explain" | "manual">("explain");
+  const [manualCity, setManualCity] = useState("");
+  const [locating, setLocating] = useState(false);
   const zodiac = useMemo(() => getZodiac(dob), [dob]);
 
-  const TOTAL = 5;
+  const TOTAL = 6;
   const next = () => setSlide((s) => s + 1);
   const finish = () => {
     onDone({
@@ -65,7 +71,32 @@ export function Onboarding({ onDone }: { onDone: (data: OnboardingData) => void 
       zodiac: zodiac?.sign ?? "",
       symbol: zodiac?.symbol ?? "✦",
       living_situation: living ?? "other",
+      city: city || null,
     });
+  };
+
+  const handleAllowLocation = async () => {
+    setLocating(true);
+    try {
+      const loc = await detectLocation();
+      if (loc.city) {
+        setCity(loc.city);
+        next();
+      } else {
+        setLocationMode("manual");
+      }
+    } catch {
+      setLocationMode("manual");
+    } finally {
+      setLocating(false);
+    }
+  };
+
+  const handleSaveManualCity = () => {
+    const trimmed = manualCity.trim();
+    if (!trimmed) return;
+    setCity(trimmed);
+    next();
   };
 
   return (
@@ -120,9 +151,12 @@ export function Onboarding({ onDone }: { onDone: (data: OnboardingData) => void 
         {slide === 2 && (
           <>
             <div className="flex-1 flex flex-col justify-center">
-              <h2 className="font-display text-[2.4rem] leading-[1.02] -tracking-[0.03em] mb-8">
+              <h2 className="font-display text-[2.4rem] leading-[1.02] -tracking-[0.03em] mb-2">
                 When did the chaos begin?
               </h2>
+              <p className="text-sm text-white/80 mb-6 font-semibold">
+                (your date of birth — for zodiac + age-based questions that actually make sense for your life)
+              </p>
               <input
                 type="date"
                 value={dob}
@@ -175,6 +209,52 @@ export function Onboarding({ onDone }: { onDone: (data: OnboardingData) => void 
         )}
 
         {slide === 4 && (
+          <>
+            <div className="flex-1 flex flex-col justify-center items-center text-center">
+              <div className="text-6xl mb-5">📍</div>
+              <h2 className="font-display text-[2.2rem] leading-[1.05] -tracking-[0.03em] mb-4">
+                era os wants to know your city
+              </h2>
+
+              {locationMode === "explain" && (
+                <>
+                  <p className="text-[15px] font-semibold text-white/90 leading-relaxed max-w-[18rem] mb-8">
+                    Toh teri questions actually teri life ke baare mein hon — kisi aur ki nahi.
+                    Delhi mein kya chal raha hai, wahi puchenge.
+                  </p>
+                  <div className="w-full grid gap-3">
+                    <PinkButton onClick={handleAllowLocation} disabled={locating}>
+                      {locating ? "Locating..." : "Allow Location"}
+                    </PinkButton>
+                    <button
+                      onClick={() => setLocationMode("manual")}
+                      className="press w-full rounded-2xl py-5 font-bold text-white bg-white/10 border-4 border-black backdrop-blur-sm hover:bg-white/20 transition-colors"
+                    >
+                      Enter my city manually
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {locationMode === "manual" && (
+                <>
+                  <input
+                    autoFocus
+                    value={manualCity}
+                    onChange={(e) => setManualCity(e.target.value)}
+                    placeholder="e.g. Delhi, Mumbai, Bangalore..."
+                    className="w-full rounded-2xl bg-white text-black placeholder-black/40 px-6 py-5 text-xl font-bold outline-none border-4 border-black focus:ring-4 focus:ring-[#FFBE0B] mb-6"
+                  />
+                  <PinkButton onClick={handleSaveManualCity} disabled={!manualCity.trim()}>
+                    Save City
+                  </PinkButton>
+                </>
+              )}
+            </div>
+          </>
+        )}
+
+        {slide === 5 && (
           <>
             <div className="flex-1 flex flex-col justify-center items-center text-center">
               <h2 className="font-display text-[2.4rem] leading-[1.02] -tracking-[0.03em]">
