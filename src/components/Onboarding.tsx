@@ -65,13 +65,14 @@ export function Onboarding({ onDone }: { onDone: (data: OnboardingData) => void 
   const [name, setName] = useState("");
   const [dob, setDob] = useState("");
   const [living, setLiving] = useState<LivingSituation | null>(null);
+  const [gender, setGender] = useState<Gender | null>(null);
   const [city, setCity] = useState<string | null>(null);
   const [locationMode, setLocationMode] = useState<"explain" | "manual">("explain");
   const [manualCity, setManualCity] = useState("");
   const [locating, setLocating] = useState(false);
   const zodiac = useMemo(() => getZodiac(dob), [dob]);
 
-  const TOTAL = 6;
+  const TOTAL = 7;
   const next = () => setSlide((s) => s + 1);
   const finish = () => {
     onDone({
@@ -80,6 +81,7 @@ export function Onboarding({ onDone }: { onDone: (data: OnboardingData) => void 
       zodiac: zodiac?.sign ?? "",
       symbol: zodiac?.symbol ?? "✦",
       living_situation: living ?? "other",
+      gender: gender ?? "prefer_not",
       city: city || null,
     });
   };
