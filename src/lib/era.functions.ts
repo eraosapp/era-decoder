@@ -180,12 +180,14 @@ export const getDailyQuestions = createServerFn({ method: "POST" })
     if (!apiKey) throw new Error("LOVABLE_API_KEY not configured");
 
     const { data: profile } = await supabase
-      .from("profiles").select("region, dob, zodiac, name, living_situation").eq("id", userId).maybeSingle();
+      .from("profiles").select("region, dob, zodiac, name, living_situation, gender").eq("id", userId).maybeSingle();
     const region = (profile?.region as "GLOBAL" | "IN") || "GLOBAL";
     const age = ageFromDob(profile?.dob);
+    const birthYear = birthYearFromDob(profile?.dob);
     const city = data?.city?.trim() || null;
     const country = data?.country?.trim() || (region === "IN" ? "IN" : null);
     const living = (profile?.living_situation as string | null) || null;
+    const gender = (profile?.gender as string | null) || null;
 
     const now = new Date();
     const dayOfWeek = now.toLocaleDateString("en-US", { weekday: "long" });
@@ -193,22 +195,12 @@ export const getDailyQuestions = createServerFn({ method: "POST" })
     const moon = moonPhase();
     const trending = await fetchTrending(city);
 
-    const isIndia = region === "IN";
-    let ageThemes = "general life check-ins";
-    if (age != null) {
-      if (age <= 18) ageThemes = "exams, curfew, first crush, parents, friend groups";
-      else if (age <= 21) ageThemes = "college, hostel, heartbreak, placements, hometown vs city";
-      else if (age <= 24) ageThemes = "first job, quarter-life crisis, salary vs passion, hostel-to-PG";
-      else if (age <= 27) ageThemes = isIndia
-        ? "marriage pressure, log kya kahenge, career vs family, settle down talk, money anxiety, cousin comparison"
-        : "career grind, relationship doubt, friend drift, comparison spirals";
-      else if (age <= 32) ageThemes = "therapy talk, career pivot, 'where did time go', friends drifting, family expectations";
-      else ageThemes = "life check-ins, what matters now, late-life pivots";
-    }
+    const stageLine = lifeStageRules(birthYear, gender, living);
+    const genderLine = genderGrammarLine(gender);
 
     let livingLine = "";
-    if (living === "home") livingLine = "LIVING SITUATION: At home with family. Questions can touch on family dynamics, parents in the next room, ghar wali politics, log kya kahenge. NEVER ask about hostel life, roommates, mess food, or 'alone in a new city' loneliness.";
-    else if (living === "hostel") livingLine = "LIVING SITUATION: Hostel / college campus. Roommates, mess, warden, late-night chai, campus crushes are fair game. NEVER ask about family at home, ghar pe pressure, or 'alone in a new city' isolation.";
+    if (living === "home") livingLine = "LIVING SITUATION: At home with family. Questions can touch on family dynamics, parents in the next room, ghar wali politics, log kya kahenge. STRICT: NEVER ask about hostel life, roommates, mess food, warden, or 'alone in a new city' loneliness.";
+    else if (living === "hostel") livingLine = "LIVING SITUATION: Hostel / college campus. Roommates, mess, warden, late-night chai, campus crushes are fair game. NEVER ask about parents in the next room or 'alone in a new city' isolation.";
     else if (living === "alone") livingLine = "LIVING SITUATION: Alone / PG in a new city. Independence, loneliness, missing home, cooking for one, swiggy at 2am, city isolation are fair game. NEVER assume family or roommates are present.";
     else if (living === "other") livingLine = "LIVING SITUATION: Unconventional setup. Keep questions universal — don't assume family, hostel, or solo city life.";
 
@@ -221,7 +213,8 @@ export const getDailyQuestions = createServerFn({ method: "POST" })
 
 USER CONTEXT:
 - Name: ${profile?.name || "friend"}
-- Age: ${age ?? "unknown"} (themes: ${ageThemes})
+- Birth year: ${birthYear ?? "unknown"} (current age: ${age ?? "unknown"})
+- Gender: ${gender ?? "unspecified"}
 - Region: ${region}${country ? ` (${country})` : ""}
 - City: ${city || "unknown"}
 - Zodiac: ${profile?.zodiac || "unknown"}
@@ -229,7 +222,11 @@ USER CONTEXT:
 - Moon phase: ${moon}
 ${trendingLine}
 
+${stageLine}
+
 ${livingLine}
+
+${genderLine}
 
 ${langLine}
 
@@ -237,13 +234,14 @@ RULES:
 - Exactly 3 questions, each with exactly 4 options AND a subtitle.
 - SUBTITLE: one short clarifying line in plain words, written like a knowing friend whispering the real meaning. Lowercase, casual, often in parentheses-style. Max 14 words. Mix Hinglish if Indian.
   - GOOD: "(basically — what's living rent free in your head rn)"
-  - GOOD: "(the thing you keep doing even though you know you shouldn't)"
   - GOOD: "(yaar sach mein — koi bhi judgement nahi)"
-  - BAD: "Pick the option that best describes you" (too formal, too generic)
+  - BAD: "Pick the option that best describes you"
 - At least ONE question must reference something REAL happening in ${city || "their city"} this week or the current day/moon/weekend energy.
 - Questions feel like the user's best friend texting them — casual, specific, knowing.
 - Options must be embarrassingly accurate — "stop reading my mind" energy.
-- Match the age themes AND living situation above. Never ask about situations the user isn't in.
+- OBEY the LIFE STAGE rules above strictly — never assume college for a school student, never assume school for a college student or working adult.
+- OBEY the LIVING SITUATION rules — never ask about situations the user isn't in.
+- OBEY the GENDER GRAMMAR rules in every question, subtitle, and option — wrong verb conjugation or wrong slang ('bhai' to a girl, etc) is a failure.
 - Keep questions under 18 words. Options under 14 words. Subtitle under 14 words.
 - No emojis inside questions, subtitles, or options.
 - Return ONLY via the tool call.`;
