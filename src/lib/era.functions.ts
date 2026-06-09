@@ -57,6 +57,57 @@ function ageBucketFor(age: number | null): string {
   return `${age}`;
 }
 
+function birthYearFromDob(dob?: string | null): number | null {
+  if (!dob) return null;
+  const d = new Date(dob);
+  if (isNaN(d.getTime())) return null;
+  return d.getUTCFullYear();
+}
+
+function lifeStageRules(birthYear: number | null, gender: string | null, living: string | null): string {
+  if (birthYear == null) return "LIFE STAGE: general adult — keep questions universal.";
+  const y = birthYear;
+  const isFemale = gender === "female";
+  const isMale = gender === "male";
+  const hostelOK = living === "hostel";
+  const aloneOK = living === "alone";
+
+  if (y >= 2009 && y <= 2010) {
+    return "LIFE STAGE (born " + y + ", age 15-16): Class 9-10. Themes: board pressure, crush in class, phone chheen liya, marks ki tension, parents checking messages, tuition vs friends. STRICT: NEVER college, hostel, job, placements, salary, marriage, or PG questions.";
+  }
+  if (y >= 2007 && y <= 2008) {
+    return "LIFE STAGE (born " + y + ", age 17-18): Class 11-12. Themes: boards tension, stream confusion (PCM/PCB/commerce), coaching vs school, JEE/NEET/CUET grind, first heartbreak, parents' expectations." + (hostelOK ? " Hostel themes fine." : " STRICT: NEVER hostel/PG/independence themes (they live at home).") + " STRICT: NEVER job, salary, marriage, or 'first job' questions.";
+  }
+  if (y >= 2005 && y <= 2006) {
+    return "LIFE STAGE (born " + y + ", age 19-20): First/second year of college or gap year. Themes: new friend groups, FOMO from college life, situationships, placement tension just starting, hometown vs city, identity reinvention." + (hostelOK ? " Hostel/mess/roommate themes fine." : aloneOK ? " PG/alone-in-city themes fine." : " Family-at-home tension is fair.") + " STRICT: NEVER school/board/'class teacher' questions. NEVER marriage pressure.";
+  }
+  if (y >= 2003 && y <= 2004) {
+    return "LIFE STAGE (born " + y + ", age 21-22): Final year of college or just graduated. Themes: placement anxiety, log puch rahe 'kya karoge', quarter-life crisis, friend groups splitting, last-sem nostalgia, situationship-to-LDR." + (hostelOK ? " Hostel themes fine." : "") + " STRICT: NEVER school questions. NEVER 5-years-into-career themes.";
+  }
+  if (y >= 2001 && y <= 2002) {
+    return "LIFE STAGE (born " + y + ", age 23-24): First job / early career. Themes: office politics, salary vs passion, parents' expectations, weekend escapism, relationship pressure starting, comparison with school friends on LinkedIn. STRICT: NEVER school or college-student questions.";
+  }
+  if (y >= 1999 && y <= 2000) {
+    if (isFemale) {
+      return "LIFE STAGE (born " + y + ", age 25-26, female): Marriage pressure peak. Themes: rishte, career vs shaadi, log kya kahenge, body clock comments from relatives, friends getting married, sneaky biodata sharing. STRICT: NEVER school/college-student framing.";
+    }
+    return "LIFE STAGE (born " + y + ", age 25-26" + (isMale ? ", male" : "") + "): Settle-down pressure. Themes: package kitna hai, ghar kab loge, comparison with peers' promotions, parents nudging about marriage, career-pivot temptation. STRICT: NEVER school/college-student framing.";
+  }
+  // fallback
+  const age = Math.max(0, new Date().getUTCFullYear() - y);
+  return "LIFE STAGE (born " + y + ", age ~" + age + "): Keep questions age-appropriate. NEVER assume school for adults or college for school students.";
+}
+
+function genderGrammarLine(gender?: string | null): string {
+  if (gender === "female") {
+    return "GENDER GRAMMAR (female): Use feminine Hindi verbs — 'karti hai', 'karegi', 'soch rahi thi', 'hogi'. Use 'yaar', 'girlie', 'babe'. STRICT: NEVER say 'bhai' or 'bro' to her. English pronouns: she/her.";
+  }
+  if (gender === "male") {
+    return "GENDER GRAMMAR (male): Use masculine Hindi verbs — 'karta hai', 'karega', 'soch raha tha', 'hoga'. Use 'bhai', 'bro', 'yaar' freely. English pronouns: he/him.";
+  }
+  return "GENDER GRAMMAR (neutral): Use only 'yaar' — NEVER 'bhai' or 'bro' or 'girlie'. Keep Hindi verbs neutral or rephrase to avoid gendered conjugations. English pronouns: they/them.";
+}
+
 function moonPhase(): string {
   const synodic = 29.53058867;
   const anchor = Date.UTC(2000, 0, 6, 18, 14) / 86400000;
