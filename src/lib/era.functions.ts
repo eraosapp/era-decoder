@@ -57,6 +57,57 @@ function ageBucketFor(age: number | null): string {
   return `${age}`;
 }
 
+function birthYearFromDob(dob?: string | null): number | null {
+  if (!dob) return null;
+  const d = new Date(dob);
+  if (isNaN(d.getTime())) return null;
+  return d.getUTCFullYear();
+}
+
+function lifeStageRules(birthYear: number | null, gender: string | null, living: string | null): string {
+  if (birthYear == null) return "LIFE STAGE: general adult — keep questions universal.";
+  const y = birthYear;
+  const isFemale = gender === "female";
+  const isMale = gender === "male";
+  const hostelOK = living === "hostel";
+  const aloneOK = living === "alone";
+
+  if (y >= 2009 && y <= 2010) {
+    return "LIFE STAGE (born " + y + ", age 15-16): Class 9-10. Themes: board pressure, crush in class, phone chheen liya, marks ki tension, parents checking messages, tuition vs friends. STRICT: NEVER college, hostel, job, placements, salary, marriage, or PG questions.";
+  }
+  if (y >= 2007 && y <= 2008) {
+    return "LIFE STAGE (born " + y + ", age 17-18): Class 11-12. Themes: boards tension, stream confusion (PCM/PCB/commerce), coaching vs school, JEE/NEET/CUET grind, first heartbreak, parents' expectations." + (hostelOK ? " Hostel themes fine." : " STRICT: NEVER hostel/PG/independence themes (they live at home).") + " STRICT: NEVER job, salary, marriage, or 'first job' questions.";
+  }
+  if (y >= 2005 && y <= 2006) {
+    return "LIFE STAGE (born " + y + ", age 19-20): First/second year of college or gap year. Themes: new friend groups, FOMO from college life, situationships, placement tension just starting, hometown vs city, identity reinvention." + (hostelOK ? " Hostel/mess/roommate themes fine." : aloneOK ? " PG/alone-in-city themes fine." : " Family-at-home tension is fair.") + " STRICT: NEVER school/board/'class teacher' questions. NEVER marriage pressure.";
+  }
+  if (y >= 2003 && y <= 2004) {
+    return "LIFE STAGE (born " + y + ", age 21-22): Final year of college or just graduated. Themes: placement anxiety, log puch rahe 'kya karoge', quarter-life crisis, friend groups splitting, last-sem nostalgia, situationship-to-LDR." + (hostelOK ? " Hostel themes fine." : "") + " STRICT: NEVER school questions. NEVER 5-years-into-career themes.";
+  }
+  if (y >= 2001 && y <= 2002) {
+    return "LIFE STAGE (born " + y + ", age 23-24): First job / early career. Themes: office politics, salary vs passion, parents' expectations, weekend escapism, relationship pressure starting, comparison with school friends on LinkedIn. STRICT: NEVER school or college-student questions.";
+  }
+  if (y >= 1999 && y <= 2000) {
+    if (isFemale) {
+      return "LIFE STAGE (born " + y + ", age 25-26, female): Marriage pressure peak. Themes: rishte, career vs shaadi, log kya kahenge, body clock comments from relatives, friends getting married, sneaky biodata sharing. STRICT: NEVER school/college-student framing.";
+    }
+    return "LIFE STAGE (born " + y + ", age 25-26" + (isMale ? ", male" : "") + "): Settle-down pressure. Themes: package kitna hai, ghar kab loge, comparison with peers' promotions, parents nudging about marriage, career-pivot temptation. STRICT: NEVER school/college-student framing.";
+  }
+  // fallback
+  const age = Math.max(0, new Date().getUTCFullYear() - y);
+  return "LIFE STAGE (born " + y + ", age ~" + age + "): Keep questions age-appropriate. NEVER assume school for adults or college for school students.";
+}
+
+function genderGrammarLine(gender?: string | null): string {
+  if (gender === "female") {
+    return "GENDER GRAMMAR (female): Use feminine Hindi verbs — 'karti hai', 'karegi', 'soch rahi thi', 'hogi'. Use 'yaar', 'girlie', 'babe'. STRICT: NEVER say 'bhai' or 'bro' to her. English pronouns: she/her.";
+  }
+  if (gender === "male") {
+    return "GENDER GRAMMAR (male): Use masculine Hindi verbs — 'karta hai', 'karega', 'soch raha tha', 'hoga'. Use 'bhai', 'bro', 'yaar' freely. English pronouns: he/him.";
+  }
+  return "GENDER GRAMMAR (neutral): Use only 'yaar' — NEVER 'bhai' or 'bro' or 'girlie'. Keep Hindi verbs neutral or rephrase to avoid gendered conjugations. English pronouns: they/them.";
+}
+
 function moonPhase(): string {
   const synodic = 29.53058867;
   const anchor = Date.UTC(2000, 0, 6, 18, 14) / 86400000;
@@ -129,12 +180,14 @@ export const getDailyQuestions = createServerFn({ method: "POST" })
     if (!apiKey) throw new Error("LOVABLE_API_KEY not configured");
 
     const { data: profile } = await supabase
-      .from("profiles").select("region, dob, zodiac, name, living_situation").eq("id", userId).maybeSingle();
+      .from("profiles").select("region, dob, zodiac, name, living_situation, gender").eq("id", userId).maybeSingle();
     const region = (profile?.region as "GLOBAL" | "IN") || "GLOBAL";
     const age = ageFromDob(profile?.dob);
+    const birthYear = birthYearFromDob(profile?.dob);
     const city = data?.city?.trim() || null;
     const country = data?.country?.trim() || (region === "IN" ? "IN" : null);
     const living = (profile?.living_situation as string | null) || null;
+    const gender = (profile?.gender as string | null) || null;
 
     const now = new Date();
     const dayOfWeek = now.toLocaleDateString("en-US", { weekday: "long" });
@@ -142,22 +195,12 @@ export const getDailyQuestions = createServerFn({ method: "POST" })
     const moon = moonPhase();
     const trending = await fetchTrending(city);
 
-    const isIndia = region === "IN";
-    let ageThemes = "general life check-ins";
-    if (age != null) {
-      if (age <= 18) ageThemes = "exams, curfew, first crush, parents, friend groups";
-      else if (age <= 21) ageThemes = "college, hostel, heartbreak, placements, hometown vs city";
-      else if (age <= 24) ageThemes = "first job, quarter-life crisis, salary vs passion, hostel-to-PG";
-      else if (age <= 27) ageThemes = isIndia
-        ? "marriage pressure, log kya kahenge, career vs family, settle down talk, money anxiety, cousin comparison"
-        : "career grind, relationship doubt, friend drift, comparison spirals";
-      else if (age <= 32) ageThemes = "therapy talk, career pivot, 'where did time go', friends drifting, family expectations";
-      else ageThemes = "life check-ins, what matters now, late-life pivots";
-    }
+    const stageLine = lifeStageRules(birthYear, gender, living);
+    const genderLine = genderGrammarLine(gender);
 
     let livingLine = "";
-    if (living === "home") livingLine = "LIVING SITUATION: At home with family. Questions can touch on family dynamics, parents in the next room, ghar wali politics, log kya kahenge. NEVER ask about hostel life, roommates, mess food, or 'alone in a new city' loneliness.";
-    else if (living === "hostel") livingLine = "LIVING SITUATION: Hostel / college campus. Roommates, mess, warden, late-night chai, campus crushes are fair game. NEVER ask about family at home, ghar pe pressure, or 'alone in a new city' isolation.";
+    if (living === "home") livingLine = "LIVING SITUATION: At home with family. Questions can touch on family dynamics, parents in the next room, ghar wali politics, log kya kahenge. STRICT: NEVER ask about hostel life, roommates, mess food, warden, or 'alone in a new city' loneliness.";
+    else if (living === "hostel") livingLine = "LIVING SITUATION: Hostel / college campus. Roommates, mess, warden, late-night chai, campus crushes are fair game. NEVER ask about parents in the next room or 'alone in a new city' isolation.";
     else if (living === "alone") livingLine = "LIVING SITUATION: Alone / PG in a new city. Independence, loneliness, missing home, cooking for one, swiggy at 2am, city isolation are fair game. NEVER assume family or roommates are present.";
     else if (living === "other") livingLine = "LIVING SITUATION: Unconventional setup. Keep questions universal — don't assume family, hostel, or solo city life.";
 
@@ -170,7 +213,8 @@ export const getDailyQuestions = createServerFn({ method: "POST" })
 
 USER CONTEXT:
 - Name: ${profile?.name || "friend"}
-- Age: ${age ?? "unknown"} (themes: ${ageThemes})
+- Birth year: ${birthYear ?? "unknown"} (current age: ${age ?? "unknown"})
+- Gender: ${gender ?? "unspecified"}
 - Region: ${region}${country ? ` (${country})` : ""}
 - City: ${city || "unknown"}
 - Zodiac: ${profile?.zodiac || "unknown"}
@@ -178,7 +222,11 @@ USER CONTEXT:
 - Moon phase: ${moon}
 ${trendingLine}
 
+${stageLine}
+
 ${livingLine}
+
+${genderLine}
 
 ${langLine}
 
@@ -186,13 +234,14 @@ RULES:
 - Exactly 3 questions, each with exactly 4 options AND a subtitle.
 - SUBTITLE: one short clarifying line in plain words, written like a knowing friend whispering the real meaning. Lowercase, casual, often in parentheses-style. Max 14 words. Mix Hinglish if Indian.
   - GOOD: "(basically — what's living rent free in your head rn)"
-  - GOOD: "(the thing you keep doing even though you know you shouldn't)"
   - GOOD: "(yaar sach mein — koi bhi judgement nahi)"
-  - BAD: "Pick the option that best describes you" (too formal, too generic)
+  - BAD: "Pick the option that best describes you"
 - At least ONE question must reference something REAL happening in ${city || "their city"} this week or the current day/moon/weekend energy.
 - Questions feel like the user's best friend texting them — casual, specific, knowing.
 - Options must be embarrassingly accurate — "stop reading my mind" energy.
-- Match the age themes AND living situation above. Never ask about situations the user isn't in.
+- OBEY the LIFE STAGE rules above strictly — never assume college for a school student, never assume school for a college student or working adult.
+- OBEY the LIVING SITUATION rules — never ask about situations the user isn't in.
+- OBEY the GENDER GRAMMAR rules in every question, subtitle, and option — wrong verb conjugation or wrong slang ('bhai' to a girl, etc) is a failure.
 - Keep questions under 18 words. Options under 14 words. Subtitle under 14 words.
 - No emojis inside questions, subtitles, or options.
 - Return ONLY via the tool call.`;
@@ -288,16 +337,25 @@ async function generateCard(opts: {
   zodiac?: string | null;
   region: string;
   city?: string | null;
+  gender?: string | null;
+  birthYear?: number | null;
+  living?: string | null;
   answers: { question: string; answer: string }[];
 }): Promise<EraCard> {
-  const { apiKey, name, zodiac, region, city, answers } = opts;
+  const { apiKey, name, zodiac, region, city, gender, birthYear, living, answers } = opts;
   const isIndia = region === "IN";
   const langLine = regionalLangLine(region, city);
+  const genderLine = genderGrammarLine(gender);
+  const stageLine = lifeStageRules(birthYear ?? null, gender ?? null, living ?? null);
 
   const prompt = `You are the unapologetic mirror of era os.
 Your job: make the user feel SEEN in a way that is slightly uncomfortable.
 Like their most perceptive friend just caught them in their performance — with love.
-${name ? `Name: ${name}\n` : ""}${zodiac ? `Zodiac: ${zodiac}\n` : ""}${city ? `City: ${city}\n` : ""}
+${name ? `Name: ${name}\n` : ""}${zodiac ? `Zodiac: ${zodiac}\n` : ""}${city ? `City: ${city}\n` : ""}${gender ? `Gender: ${gender}\n` : ""}${birthYear ? `Birth year: ${birthYear}\n` : ""}
+${stageLine}
+
+${genderLine}
+
 ${langLine}
 
 THEIR ANSWERS TODAY:
@@ -309,6 +367,10 @@ BRUTAL TRUTH — non-negotiable:
 - Say what they have not admitted to themselves yet.
 - BAD: "You overthink and need to relax."
 - GOOD: "You have been replaying one specific conversation from 4 days ago and have written 6 different versions of what you should have said."
+
+GENDER GRAMMAR is non-negotiable. Apply it to brutal_truth, todays_warning, todays_power_move, cosmic_prediction, and song_reason — every Hindi verb, every form of address. Wrong conjugation or wrong slang ('bhai' to a girl) is a hard failure.
+
+LIFE STAGE is non-negotiable. Do NOT reference school if they are working; do NOT reference job/marriage if they are in Class 9-10.
 
 LESS IS MORE — every word earns its place. No hashtags. No "the universe wants you to" clichés. No emojis inside text fields.
 
@@ -388,7 +450,7 @@ export const submitDailyAnswers = createServerFn({ method: "POST" })
 
     const today = todayUTC();
     const { data: profile } = await supabase
-      .from("profiles").select("name, zodiac, dob, is_premium, region").eq("id", userId).maybeSingle();
+      .from("profiles").select("name, zodiac, dob, is_premium, region, gender, living_situation").eq("id", userId).maybeSingle();
 
     const { data: existing } = await supabase
       .from("daily_decodes").select("id, card, regenerations_used")
@@ -411,6 +473,9 @@ export const submitDailyAnswers = createServerFn({ method: "POST" })
       zodiac: profile?.zodiac,
       region: profile?.region || "GLOBAL",
       city: data.city || null,
+      gender: (profile as any)?.gender ?? null,
+      birthYear: birthYearFromDob(profile?.dob),
+      living: (profile as any)?.living_situation ?? null,
       answers: data.answers,
     });
 
@@ -452,6 +517,7 @@ const ProfileSchema = z.object({
   symbol: z.string().max(8),
   region: z.enum(["GLOBAL", "IN"]),
   living_situation: z.enum(["home", "hostel", "alone", "other"]).optional(),
+  gender: z.enum(["female", "male", "nonbinary", "prefer_not"]).optional(),
   city: z.string().max(80).optional(),
 });
 
@@ -463,6 +529,7 @@ export const upsertProfile = createServerFn({ method: "POST" })
     const { error } = await supabase.from("profiles").upsert({
       id: userId, name: data.name, dob: data.dob, zodiac: data.zodiac, symbol: data.symbol, region: data.region,
       ...(data.living_situation ? { living_situation: data.living_situation } : {}),
+      ...(data.gender ? { gender: data.gender } : {}),
       ...(data.city ? { city: data.city } : {}),
     } as any);
     if (error) throw new Error(error.message);

@@ -199,6 +199,7 @@ export type Database = {
           city: string | null
           created_at: string
           dob: string | null
+          gender: string | null
           id: string
           is_premium: boolean
           living_situation: string | null
@@ -212,6 +213,7 @@ export type Database = {
           city?: string | null
           created_at?: string
           dob?: string | null
+          gender?: string | null
           id: string
           is_premium?: boolean
           living_situation?: string | null
@@ -225,6 +227,7 @@ export type Database = {
           city?: string | null
           created_at?: string
           dob?: string | null
+          gender?: string | null
           id?: string
           is_premium?: boolean
           living_situation?: string | null
