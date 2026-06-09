@@ -450,7 +450,7 @@ export const submitDailyAnswers = createServerFn({ method: "POST" })
 
     const today = todayUTC();
     const { data: profile } = await supabase
-      .from("profiles").select("name, zodiac, dob, is_premium, region").eq("id", userId).maybeSingle();
+      .from("profiles").select("name, zodiac, dob, is_premium, region, gender, living_situation").eq("id", userId).maybeSingle();
 
     const { data: existing } = await supabase
       .from("daily_decodes").select("id, card, regenerations_used")
@@ -473,6 +473,9 @@ export const submitDailyAnswers = createServerFn({ method: "POST" })
       zodiac: profile?.zodiac,
       region: profile?.region || "GLOBAL",
       city: data.city || null,
+      gender: (profile as any)?.gender ?? null,
+      birthYear: birthYearFromDob(profile?.dob),
+      living: (profile as any)?.living_situation ?? null,
       answers: data.answers,
     });
 
