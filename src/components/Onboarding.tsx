@@ -297,7 +297,7 @@ export function Onboarding({ onDone }: { onDone: (data: OnboardingData) => void 
           </>
         )}
 
-        {slide === 5 && (
+        {slide === 6 && (
           <>
             <div className="flex-1 flex flex-col justify-center items-center text-center">
               <h2 className="font-display text-[2.4rem] leading-[1.02] -tracking-[0.03em]">
