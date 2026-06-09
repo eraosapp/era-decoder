@@ -35,12 +35,14 @@ function getZodiac(dob: string) {
 }
 
 export type LivingSituation = "home" | "hostel" | "alone" | "other";
+export type Gender = "female" | "male" | "nonbinary" | "prefer_not";
 export type OnboardingData = {
   name: string;
   dob: string;
   zodiac: string;
   symbol: string;
   living_situation: LivingSituation;
+  gender: Gender;
   city?: string | null;
 };
 
@@ -49,6 +51,13 @@ const LIVING_OPTIONS: { id: LivingSituation; icon: string; label: string }[] = [
   { id: "hostel", icon: "🏢", label: "Hostel / College campus" },
   { id: "alone",  icon: "🏙️", label: "Alone / PG in a new city" },
   { id: "other",  icon: "✈️", label: "Somewhere else entirely" },
+];
+
+const GENDER_OPTIONS: { id: Gender; icon: string; label: string }[] = [
+  { id: "female",     icon: "👧", label: "Female" },
+  { id: "male",       icon: "👦", label: "Male" },
+  { id: "nonbinary",  icon: "✨", label: "Non-binary" },
+  { id: "prefer_not", icon: "🤐", label: "Prefer not to say" },
 ];
 
 export function Onboarding({ onDone }: { onDone: (data: OnboardingData) => void }) {
