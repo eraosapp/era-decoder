@@ -337,16 +337,25 @@ async function generateCard(opts: {
   zodiac?: string | null;
   region: string;
   city?: string | null;
+  gender?: string | null;
+  birthYear?: number | null;
+  living?: string | null;
   answers: { question: string; answer: string }[];
 }): Promise<EraCard> {
-  const { apiKey, name, zodiac, region, city, answers } = opts;
+  const { apiKey, name, zodiac, region, city, gender, birthYear, living, answers } = opts;
   const isIndia = region === "IN";
   const langLine = regionalLangLine(region, city);
+  const genderLine = genderGrammarLine(gender);
+  const stageLine = lifeStageRules(birthYear ?? null, gender ?? null, living ?? null);
 
   const prompt = `You are the unapologetic mirror of era os.
 Your job: make the user feel SEEN in a way that is slightly uncomfortable.
 Like their most perceptive friend just caught them in their performance — with love.
-${name ? `Name: ${name}\n` : ""}${zodiac ? `Zodiac: ${zodiac}\n` : ""}${city ? `City: ${city}\n` : ""}
+${name ? `Name: ${name}\n` : ""}${zodiac ? `Zodiac: ${zodiac}\n` : ""}${city ? `City: ${city}\n` : ""}${gender ? `Gender: ${gender}\n` : ""}${birthYear ? `Birth year: ${birthYear}\n` : ""}
+${stageLine}
+
+${genderLine}
+
 ${langLine}
 
 THEIR ANSWERS TODAY:
@@ -358,6 +367,10 @@ BRUTAL TRUTH — non-negotiable:
 - Say what they have not admitted to themselves yet.
 - BAD: "You overthink and need to relax."
 - GOOD: "You have been replaying one specific conversation from 4 days ago and have written 6 different versions of what you should have said."
+
+GENDER GRAMMAR is non-negotiable. Apply it to brutal_truth, todays_warning, todays_power_move, cosmic_prediction, and song_reason — every Hindi verb, every form of address. Wrong conjugation or wrong slang ('bhai' to a girl) is a hard failure.
+
+LIFE STAGE is non-negotiable. Do NOT reference school if they are working; do NOT reference job/marriage if they are in Class 9-10.
 
 LESS IS MORE — every word earns its place. No hashtags. No "the universe wants you to" clichés. No emojis inside text fields.
 
