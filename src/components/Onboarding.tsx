@@ -221,6 +221,38 @@ export function Onboarding({ onDone }: { onDone: (data: OnboardingData) => void 
 
         {slide === 4 && (
           <>
+            <div className="flex-1 flex flex-col justify-center">
+              <h2 className="font-display text-[2.4rem] leading-[1.02] -tracking-[0.03em] mb-2">
+                One more thing —
+              </h2>
+              <p className="text-sm text-white/80 mb-6 font-semibold">
+                (so the grammar feels like your friend wrote it, not a bot)
+              </p>
+              <div className="grid gap-3">
+                {GENDER_OPTIONS.map((o) => {
+                  const sel = gender === o.id;
+                  return (
+                    <button
+                      key={o.id}
+                      onClick={() => setGender(o.id)}
+                      className={
+                        "press text-left rounded-2xl px-5 py-4 font-bold leading-snug border-4 border-black transition-all duration-200 flex items-center gap-3 " +
+                        (sel ? "bg-black text-white scale-[1.02] shadow-[0_0_0_4px_#FFBE0B]" : "bg-white text-black hover:bg-white/95")
+                      }
+                    >
+                      <span className="text-2xl">{o.icon}</span>
+                      <span>{o.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <PinkButton onClick={next} disabled={!gender}>Next</PinkButton>
+          </>
+        )}
+
+        {slide === 5 && (
+          <>
             <div className="flex-1 flex flex-col justify-center items-center text-center">
               <div className="text-6xl mb-5">📍</div>
               <h2 className="font-display text-[2.2rem] leading-[1.05] -tracking-[0.03em] mb-4">
